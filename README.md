@@ -40,7 +40,7 @@
 **清单**
 - [ ] Vite + React + TS 初始化
 - [ ] 路由：`/editor`（编辑器）`/preview`（预览）`/login`
-- [ ] 状态管理：Zustand（轻）或 RTK（更工程化）
+- [ ] 状态管理： RTK（更工程化）
 - [ ] 目录分层：`core/`（解析与生成）`ui/`（组件）`features/`（业务）`shared/`
 - [ ] 代码规范：ESLint + Prettier + Husky + lint-staged
 - [ ] 错误边界：React Error Boundary + 全局错误上报接口预留

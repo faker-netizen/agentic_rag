@@ -1,5 +1,5 @@
-import { api } from './api'
-import { setAccessToken } from '../features/auth/authSlice'
+import { api } from './api.ts'
+import { setAccessToken } from '../features/auth/authSlice.ts'
 
 type LoginReq = { username: string; password: string }
 type LoginRes = {

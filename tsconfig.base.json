@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "paths": {
+    "@d2c/components": ["./packages/components/src"],
+    "@d2c/utils": ["./packages/utils/src"]
+  },
+  "references": [
+    { "path": "./apps/web" },
+    { "path": "./apps/backend" },
+    { "path": "./packages/components" },
+    { "path": "./packages/utils" }
+  ]
+}

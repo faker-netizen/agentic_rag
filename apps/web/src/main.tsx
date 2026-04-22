@@ -7,11 +7,12 @@ import {store} from "./app/store.ts";
 import {RouterProvider} from "react-router-dom";
 import {router} from "./router";
 createRoot(document.getElementById('root')!).render(
-    <StrictMode>
+    // <StrictMode>
         <Provider store={store}>
             <ConfigProvider>
                 <RouterProvider router={router}/>
             </ConfigProvider>
         </Provider>
-    </StrictMode>,
+    // </StrictMode>
+,
 )

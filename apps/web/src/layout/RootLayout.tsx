@@ -72,10 +72,7 @@ function RootLayout() {
         return last?.pathname ?? location.pathname;
     }, [matches, location.pathname]);
 
-    const items = [
-        {key: '/home', icon: <HomeOutlined/>, label: 'home'},
-        {key: '/users', icon: <UserOutlined/>, label: 'Users'},
-    ]
+
     return (
             <Layout>
                 <Header
@@ -118,7 +115,7 @@ function RootLayout() {
                                 background: colorBgContainer,
                                 borderRadius: borderRadiusLG,
                                 padding: 16,
-                                minHeight: 'calc(100vh - 64px - 32px)', // header + content padding
+                                height: 'calc(100vh - 64px - 32px)', // header + content padding
                             }}
                         >
                             <Outlet/>

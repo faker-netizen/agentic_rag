@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+apps/backend/uploads
+.env
+.env.*
+**/.env
+**/.env.*

@@ -15,7 +15,7 @@ router.post('/query', async (req, res) => {
 
     // 使用RAG服务回答问题
     const answer = await ragService.answerWithRAG(query, { k: 3 });
-
+    console.log(22222)
     // 检索相关文档块以获取来源信息
     const relevantChunks = await ragService.retrieveRelevantChunks(query, { k: 3 });
 

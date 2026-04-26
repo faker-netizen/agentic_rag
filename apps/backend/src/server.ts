@@ -7,6 +7,8 @@ import dotenv from 'dotenv';
 import { testConnection, initializeTables } from './config/database.js';
 import documentRoutes from './routes/documents.js';
 import ragRoutes from './routes/rag.js';
+import authRoutes from './routes/auth.js';
+import { requireAuth } from './middleware/requireAuth.js';
 
 dotenv.config();
 
@@ -30,8 +32,9 @@ app.get('/health', (req, res) => {
 });
 
 // API路由
-app.use('/api/documents', documentRoutes);
-app.use('/api/rag', ragRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/documents', requireAuth, documentRoutes);
+app.use('/api/rag', requireAuth, ragRoutes);
 
 // 错误处理中间件
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

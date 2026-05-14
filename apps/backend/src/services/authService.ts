@@ -4,6 +4,7 @@
 import jwt, {Secret, SignOptions} from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import type {ResultSetHeader} from "mysql2";
 import pool from "../config/database.js";
 import {authConfig} from "../config/auth.js";
 
@@ -87,6 +88,51 @@ export function signRefreshJwt(user: AuthUser, jti: string): string {
     );
 }
 
+function normalizeEmail(email: string): string {
+    return email.trim().toLowerCase();
+}
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * 注册新用户（邮箱唯一、密码 bcrypt）
+ * @returns ok + user，或 duplicate / invalid_input
+ */
+export async function registerUser(
+    emailRaw: string,
+    passwordRaw: string
+): Promise<{ ok: true; user: AuthUser } | { ok: false; reason: "duplicate" | "invalid_input" }> {
+    const email = normalizeEmail(String(emailRaw));
+    const password = String(passwordRaw);
+
+    if (!email || !password) {
+        return {ok: false, reason: "invalid_input"};
+    }
+    // if (!emailPattern.test(email)) {
+    //     return {ok: false, reason: "invalid_input"};
+    // }
+    if (password.length < 8 || password.length > 128) {
+        return {ok: false, reason: "invalid_input"};
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    try {
+        const [result] = await pool.query<ResultSetHeader>(
+            "INSERT INTO users (email, password_hash) VALUES (?, ?)",
+            [email, passwordHash]
+        );
+        const insertId = result.insertId;
+        return {ok: true, user: {id: insertId, email}};
+    } catch (err: unknown) {
+        const code = (err as {code?: string}).code;
+        if (code === "ER_DUP_ENTRY") {
+            return {ok: false, reason: "duplicate"};
+        }
+        throw err;
+    }
+}
+
 /**
  * 验证用户密码
  * @param email 用户邮箱
@@ -94,8 +140,9 @@ export function signRefreshJwt(user: AuthUser, jti: string): string {
  * @returns 返回用户信息或null（验证失败时）
  */
 export async function verifyPassword(email: string, password: string): Promise<AuthUser | null> {
+    const emailNorm = normalizeEmail(String(email));
     const [rows] = await pool.query("SELECT id, email, password_hash FROM users WHERE email = ? LIMIT 1", [
-        email,
+        emailNorm,
     ]);
     const users = rows as UserRow[];
     const user = users[0];

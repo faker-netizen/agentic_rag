@@ -1,4 +1,5 @@
 import { createEmbeddingsModel } from "./embeddings.js";
+import {embeddingsObj, getEmbedding} from "./embeddingsFromLangchain.js";
 
 export type Vector = number[];
 
@@ -31,8 +32,9 @@ class VectorService {
     // 批量文本向量化（常用于chunk）
     async embedTexts(texts: string[]): Promise<Vector[]> {
         if (!texts.length) return [];
-        const model = createEmbeddingsModel();
-        return await model.embedDocuments(texts);
+        // const model = createEmbeddingsModel();
+        // return await model.embedDocuments(texts);
+        return await getEmbedding(texts)
     }
 
     // 计算 query 与候选向量的相似度并排序（返回 topK 下标+得分）

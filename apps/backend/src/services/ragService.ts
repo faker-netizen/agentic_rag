@@ -37,7 +37,7 @@ class RAGService {
     }): Promise<void> {
         try {
             const splitter = new RecursiveCharacterTextSplitter({
-                chunkSize: 500,   // 原 200 太碎
+                chunkSize: 300,   // 原 200 太碎
                 chunkOverlap: 100 // 原 120 在 200 下重叠过高
             });
 
@@ -56,7 +56,7 @@ class RAGService {
             if (!texts.length) return;
 
             const vectors = await VectorIndex.embedTexts(texts);
-
+            console.log(vectors)
             if (vectors.length !== texts.length) {
                 throw new Error(
                     `embed result mismatch: texts=${texts.length}, vectors=${vectors.length}`
@@ -143,7 +143,9 @@ class RAGService {
             throw error;
         }
     }
+    async deleteDocument(documentId:number){
 
+    }
     async answerWithRAG(
         query: string,
         opts?: { documentId?: number; k?: number; minScore?: number }

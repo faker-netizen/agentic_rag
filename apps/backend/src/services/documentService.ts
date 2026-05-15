@@ -1,14 +1,19 @@
 import pool from '../config/database.js';
-import {createEmbeddingsModel} from '../config/embeddings.js'
+import {createRequire} from 'node:module';
 import fs from 'fs/promises';
 import path from 'path';
-import pdf from 'pdf-parse';
 import mammoth from 'mammoth';
 import ragService from './ragService.js';
+import type {ResultSetHeader} from 'mysql2';
 
-// 文档类型定义
+const require = createRequire(import.meta.url);
+type PdfParseResult = {text?: string; numpages?: number};
+const pdfParse = require('pdf-parse') as (data: Buffer) => Promise<PdfParseResult>;
+
 export interface Document {
     id?: number;
+    user_id?: number | null;
+    knowledge_base_id?: number | null;
     title: string;
     content: string;
     file_path?: string;
@@ -17,7 +22,6 @@ export interface Document {
     updated_at?: Date;
 }
 
-// 文档块定义
 export interface DocumentChunk {
     id?: number;
     document_id: number;
@@ -26,207 +30,159 @@ export interface DocumentChunk {
     created_at?: Date;
 }
 
-// 文档服务类
 class DocumentService {
-    // 保存文档
-    async saveDocument(document: Document): Promise<number> {
-        try {
-            const [result] = await pool.query(
-                'INSERT INTO documents (title, content, file_path, file_type) VALUES (?, ?, ?, ?)',
-                [document.title, document.content, document.file_path, document.file_type]
-            );
-            return (result as any).insertId;
-        } catch (error) {
-            console.error('保存文档失败:', error);
-            throw error;
-        }
+    async saveDocument(document: Document & {user_id: number; knowledge_base_id: number}): Promise<number> {
+        const [result] = await pool.query<ResultSetHeader>(
+            'INSERT INTO documents (user_id, knowledge_base_id, title, content, file_path, file_type) VALUES (?, ?, ?, ?, ?, ?)',
+            [
+                document.user_id,
+                document.knowledge_base_id,
+                document.title,
+                document.content,
+                document.file_path ?? null,
+                document.file_type ?? null,
+            ]
+        );
+        return result.insertId;
     }
 
-    // 获取文档
-    async getDocument(id: number): Promise<Document | null> {
-        try {
-            const [rows] = await pool.query('SELECT * FROM documents WHERE id = ?', [id]);
-            const documents = rows as Document[];
-            return documents.length > 0 ? documents[0] : null;
-        } catch (error) {
-            console.error('获取文档失败:', error);
-            throw error;
-        }
+    async getDocumentScoped(
+        documentId: number,
+        userId: number,
+        knowledgeBaseId: number
+    ): Promise<Document | null> {
+        const [rows] = await pool.query(
+            `SELECT * FROM documents
+             WHERE id = ? AND user_id = ? AND knowledge_base_id = ? LIMIT 1`,
+            [documentId, userId, knowledgeBaseId]
+        );
+        const documents = rows as Document[];
+        return documents.length > 0 ? documents[0] : null;
     }
 
-    // 获取所有文档
-    async getAllDocuments(): Promise<Document[]> {
-        try {
-            const [rows] = await pool.query('SELECT * FROM documents ORDER BY created_at DESC');
-            return rows as Document[];
-        } catch (error) {
-            console.error('获取文档列表失败:', error);
-            throw error;
-        }
+    async listDocumentsInKnowledgeBase(userId: number, knowledgeBaseId: number): Promise<Document[]> {
+        const [rows] = await pool.query(
+            `SELECT id, user_id, knowledge_base_id, title, file_path, file_type, created_at, updated_at
+             FROM documents
+             WHERE user_id = ? AND knowledge_base_id = ?
+             ORDER BY created_at DESC`,
+            [userId, knowledgeBaseId]
+        );
+        return rows as Document[];
     }
 
-    // 删除文档
-    async deleteDocument(id: number): Promise<boolean> {
-        try {
-            // 从RAG向量库中移除文档
-            await ragService.deleteDocument(id);
+    async deleteDocumentScoped(
+        userId: number,
+        knowledgeBaseId: number,
+        documentId: number
+    ): Promise<boolean> {
+        const doc = await this.getDocumentScoped(documentId, userId, knowledgeBaseId);
+        if (!doc) return false;
 
-            // 从数据库中删除文档
-            const [result] = await pool.query('DELETE FROM documents WHERE id = ?', [id]);
+        await ragService.deleteEmbeddingsForDocument(documentId);
 
-            return (result as any).affectedRows > 0;
-        } catch (error) {
-            console.error('删除文档失败:', error);
-            throw error;
-        }
+        const [result] = await pool.query<ResultSetHeader>(
+            'DELETE FROM documents WHERE id = ? AND user_id = ? AND knowledge_base_id = ?',
+            [documentId, userId, knowledgeBaseId]
+        );
+        return result.affectedRows > 0;
     }
 
-    // 处理PDF文件
     async processPDF(filePath: string): Promise<string> {
+        const dataBuffer = await fs.readFile(filePath);
+        let data: PdfParseResult;
         try {
-            const dataBuffer = await fs.readFile(filePath);
-            const data = await pdf(dataBuffer);
-            return data.text;
-        } catch (error) {
-            console.error('处理PDF文件失败:', error);
-            throw error;
+            data = await pdfParse(dataBuffer);
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            throw new Error(
+                `PDF 解析失败（可能已加密、损坏或版本过新）: ${msg}`
+            );
         }
+        const text = (data.text ?? '').trim();
+        if (!text) {
+            throw new Error(
+                'PDF 中未提取到文本。若为扫描件（整页为图片），需先做 OCR；也可能是仅含图片/图层的版式文件。'
+            );
+        }
+        return data.text ?? '';
     }
 
-    // 处理Word文件
     async processWord(filePath: string): Promise<string> {
-        try {
-            const dataBuffer = await fs.readFile(filePath);
-            const result = await mammoth.extractRawText({buffer: dataBuffer});
-            return result.value;
-        } catch (error) {
-            console.error('处理Word文件失败:', error);
-            throw error;
-        }
+        const dataBuffer = await fs.readFile(filePath);
+        const result = await mammoth.extractRawText({buffer: dataBuffer});
+        return result.value;
     }
 
-    // 处理文本文件
     async processText(filePath: string): Promise<string> {
-        try {
-            return await fs.readFile(filePath, 'utf-8');
-        } catch (error) {
-            console.error('处理文本文件失败:', error);
-            throw error;
-        }
+        return await fs.readFile(filePath, 'utf-8');
     }
 
-    // 根据文件类型处理文件
-    async processFile(filePath: string, fileType: string): Promise<string> {
+    async processFile(filePath: string, _fileType: string): Promise<string> {
         const ext = path.extname(filePath).toLowerCase();
 
         if (ext === '.pdf') {
             return await this.processPDF(filePath);
-        } else if (['.doc', '.docx'].includes(ext)) {
+        }
+        if (['.doc', '.docx'].includes(ext)) {
             return await this.processWord(filePath);
-        } else if (['.txt', '.md'].includes(ext)) {
+        }
+        if (['.txt', '.md'].includes(ext)) {
             return await this.processText(filePath);
-        } else {
-            throw new Error(`不支持的文件类型: ${ext}`);
         }
+        throw new Error(`不支持的文件类型: ${ext}`);
     }
 
-    // 将文档分割成块
-    chunkText(text: string, chunkSize: number = 1000, overlap: number = 200): string[] {
-        const chunks: string[] = [];
-        let start = 0;
 
-        while (start < text.length) {
-            const end = Math.min(start + chunkSize, text.length);
-            chunks.push(text.slice(start, end));
-            start = end - overlap;
+
+    async processAndSaveDocument(
+        filePath: string,
+        title: string,
+        userId: number,
+        knowledgeBaseId: number
+    ): Promise<number> {
+        const content = (await this.processFile(filePath, path.extname(filePath))).trim();
+        if (!content) {
+            throw new Error('文件解析后内容为空，无法建立检索（请检查是否为扫描版 PDF 或空文档）');
         }
 
-        return chunks;
+        const documentId = await this.saveDocument({
+            user_id: userId,
+            knowledge_base_id: knowledgeBaseId,
+            title,
+            content,
+            file_path: filePath,
+            file_type: path.extname(filePath),
+        });
+
+        await ragService.ingestDocument({
+            text: content,
+            documentId,
+            title,
+            source: filePath,
+        });
+
+        return documentId;
     }
 
-    // 保存文档块及其向量
-    async saveDocumentChunks(documentId: number, chunks: string[]): Promise<void> {
-        try {
-            const embeddingsModel = createEmbeddingsModel();
-            for (const chunk of chunks) {
-                // 生成向量
-                const embedding = await embeddingsModel.embedQuery(chunk);
+    async searchSimilarChunks(
+        query: string,
+        userId: number,
+        knowledgeBaseId: number,
+        limit: number = 5
+    ): Promise<DocumentChunk[]> {
+        const relevantChunks = await ragService.retrieveRelevantChunks(query, {
+            k: limit,
+            userId,
+            knowledgeBaseId,
+        });
 
-                // 保存到数据库
-                await pool.query(
-                    'INSERT INTO embeddings (document_id, chunk_text, embedding) VALUES (?, ?, ?)',
-                    [documentId, chunk, JSON.stringify(embedding)]
-                );
-            }
-        } catch (error) {
-            console.error('保存文档块失败:', error);
-            throw error;
-        }
-    }
-
-    // 处理并保存文档
-    async processAndSaveDocument(filePath: string, title: string): Promise<number> {
-        try {
-            // 处理文件内容
-            const content = await this.processFile(filePath, path.extname(filePath));
-
-            // 保存文档
-            const documentId = await this.saveDocument({
-                title,
-                content,
-                file_path: filePath,
-                file_type: path.extname(filePath)
-            });
-
-            // 使用RAG服务摄入文档
-            await ragService.ingestDocument({
-                text: content,
-                documentId,
-                title,
-                source: filePath,
-            });
-
-            return documentId;
-        } catch (error) {
-            console.error('处理并保存文档失败:', error);
-            throw error;
-        }
-    }
-
-    // 搜索相关文档块
-    async searchSimilarChunks(query: string, limit: number = 5): Promise<DocumentChunk[]> {
-        try {
-            // 使用RAG服务检索相关文档块
-            const relevantChunks = await ragService.retrieveRelevantChunks(query, { k: limit });
-
-            // 转换为DocumentChunk格式以保持API兼容性
-            return relevantChunks.map((chunk, index) => ({
-                id: index,
-                document_id: chunk.metadata.documentId,
-                chunk_text: chunk.content,
-                similarity: chunk.score || 0,
-            }));
-        } catch (error) {
-            console.error('搜索相似文档块失败:', error);
-            throw error;
-        }
-    }
-
-    // 计算余弦相似度
-    private cosineSimilarity(vecA: number[], vecB: number[]): number {
-        let dotProduct = 0;
-        let normA = 0;
-        let normB = 0;
-
-        for (let i = 0; i < vecA.length; i++) {
-            dotProduct += vecA[i] * vecB[i];
-            normA += vecA[i] * vecA[i];
-            normB += vecB[i] * vecB[i];
-        }
-
-        const denom = Math.sqrt(normA) * Math.sqrt(normB);
-        if (!denom) return 0;
-        return dotProduct / denom;
+        return relevantChunks.map((chunk, index) => ({
+            id: index,
+            document_id: chunk.metadata.documentId,
+            chunk_text: chunk.content,
+            similarity: chunk.score || 0,
+        }));
     }
 }
 

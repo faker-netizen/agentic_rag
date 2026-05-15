@@ -1,10 +1,9 @@
-import { createEmbeddingsModel } from "./embeddings.js";
-import {embeddingsObj, getEmbedding} from "./embeddingsFromLangchain.js";
+import {getEmbedding} from "./qwenEmbedding.js";
 
 export type Vector = number[];
 
 class VectorService {
-     cosineSimilarity(a: Vector, b: Vector): number {
+    cosineSimilarity(a: Vector, b: Vector): number {
         if (!a.length || !b.length || a.length !== b.length) return 0;
 
         let dot = 0;
@@ -22,27 +21,22 @@ class VectorService {
         return dot / denom;
     }
 
-    // 单条文本向量化（常用于query）
     async embedText(text: string): Promise<Vector> {
-        const model = createEmbeddingsModel();
-        const [vec] = await model.embedDocuments([text]);
-        return vec;
+        if (!text.length) return [];
+        const batch = await getEmbedding([text]);
+        return batch[0] ?? [];
     }
 
-    // 批量文本向量化（常用于chunk）
     async embedTexts(texts: string[]): Promise<Vector[]> {
         if (!texts.length) return [];
-        // const model = createEmbeddingsModel();
-        // return await model.embedDocuments(texts);
-        return await getEmbedding(texts)
+        return await getEmbedding(texts);
     }
 
-    // 计算 query 与候选向量的相似度并排序（返回 topK 下标+得分）
     rankBySimilarity(
         queryVector: Vector,
         candidates: Vector[],
         topK: number = 5
-    ): Array<{ index: number; score: number }> {
+    ): Array<{index: number; score: number}> {
         const scored = candidates.map((vec, idx) => ({
             index: idx,
             score: this.cosineSimilarity(queryVector, vec),

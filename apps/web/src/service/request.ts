@@ -260,6 +260,11 @@ export const http = {
         return unwrap<T>(res);
     },
 
+    async patch<T, B = unknown>(url: string, data?: B, config?: AxiosRequestConfig): Promise<T> {
+        const res = await instance.patch(url, data, config);
+        return unwrap<T>(res);
+    },
+
     async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
         const res = await instance.delete(url, config);
         return unwrap<T>(res);

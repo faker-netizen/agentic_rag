@@ -5,6 +5,7 @@ import {HomeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, UserOutlined} from "
 import {useMemo, useState} from "react";
 import type { ItemType } from "antd/es/menu/interface";
 import {router} from "@/router";
+import {clearAuth} from "@/service/token.ts";
 
 const {Header, Content, Footer, Sider} = Layout
 
@@ -96,6 +97,17 @@ function RootLayout() {
                     <div style={{fontWeight: 600}}>Admin</div>
                     <div style={{marginLeft: 'auto', opacity: 0.7}}>
                         {location.pathname}
+                    </div>
+                    <div>
+                        <Button
+                            type="primary"
+                            onClick={() => {
+                                clearAuth();
+                                navigate("/login", {replace: true});
+                            }}
+                        >
+                            登出
+                        </Button>
                     </div>
                 </Header>
                 <Layout>

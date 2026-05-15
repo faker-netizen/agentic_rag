@@ -113,7 +113,6 @@ router.post("/register", async (req, res) => {
         }
 
         const {accessToken, refreshToken, refreshExpiresAt} = await issueTokenPair(created.user);
-
         res.cookie(authConfig.refreshCookieName, refreshToken, {
             httpOnly: true,
             secure: authConfig.cookieSecure,

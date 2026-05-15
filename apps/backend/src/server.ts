@@ -5,8 +5,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { testConnection, initializeTables } from './config/database.js';
-import documentRoutes from './routes/documents.js';
+import knowledgeBaseRoutes from './routes/knowledgeBases.js';
 import ragRoutes from './routes/rag.js';
+import chatRoutes from './routes/chat.js';
 import authRoutes from './routes/auth.js';
 import { requireAuth } from './middleware/requireAuth.js';
 
@@ -33,8 +34,9 @@ app.get('/health', (req, res) => {
 
 // API路由
 app.use('/api/auth', authRoutes);
-app.use('/api/documents', requireAuth, documentRoutes);
+app.use('/api/knowledge-bases', requireAuth, knowledgeBaseRoutes);
 app.use('/api/rag', requireAuth, ragRoutes);
+app.use('/api/chat', requireAuth, chatRoutes);
 
 // 错误处理中间件
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -62,8 +64,9 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`服务器运行在 http://localhost:${PORT}`);
       console.log(`健康检查: http://localhost:${PORT}/health`);
-      console.log(`文档API: http://localhost:${PORT}/api/documents`);
+      console.log(`知识库与文档API: http://localhost:${PORT}/api/knowledge-bases`);
       console.log(`RAG API: http://localhost:${PORT}/api/rag`);
+      console.log(`Chat API: http://localhost:${PORT}/api/chat`);
     });
   } catch (error) {
     console.error('服务器启动失败:', error);

@@ -1,4 +1,5 @@
 import mysql from 'mysql2/promise';
+import type {RowDataPacket} from 'mysql2';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 
@@ -32,6 +33,56 @@ export const testConnection = async (): Promise<boolean> => {
     return false;
   }
 };
+
+async function tableHasColumn(
+  connection: mysql.PoolConnection,
+  table: string,
+  column: string
+): Promise<boolean> {
+  const [rows] = await connection.query<RowDataPacket[]>(
+    `SELECT 1 AS ok FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1`,
+    [table, column]
+  );
+  return rows.length > 0;
+}
+
+async function migrateKnowledgeBaseSchema(connection: mysql.PoolConnection): Promise<void> {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS knowledge_bases (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      KEY idx_kb_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  if (!(await tableHasColumn(connection, 'documents', 'user_id'))) {
+    await connection.query(
+      'ALTER TABLE documents ADD COLUMN user_id INT NULL, ADD KEY idx_documents_user (user_id)'
+    );
+    await connection.query(`
+      ALTER TABLE documents
+        ADD CONSTRAINT fk_documents_user
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    `);
+  }
+
+  if (!(await tableHasColumn(connection, 'documents', 'knowledge_base_id'))) {
+    await connection.query(
+      'ALTER TABLE documents ADD COLUMN knowledge_base_id INT NULL, ADD KEY idx_documents_kb (knowledge_base_id)'
+    );
+    await connection.query(`
+      ALTER TABLE documents
+        ADD CONSTRAINT fk_documents_kb
+        FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE
+    `);
+  }
+}
 
 // 初始化数据库表
 export const initializeTables = async (): Promise<void> => {
@@ -89,6 +140,36 @@ export const initializeTables = async (): Promise<void> => {
         embedding JSON NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    await migrateKnowledgeBaseSchema(connection);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS chat_sessions (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        knowledge_base_id INT NULL,
+        title VARCHAR(255) NOT NULL DEFAULT '新会话',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE SET NULL,
+        KEY idx_chat_sessions_user (user_id),
+        KEY idx_chat_sessions_updated (updated_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        session_id INT NOT NULL,
+        role VARCHAR(20) NOT NULL,
+        content MEDIUMTEXT NOT NULL,
+        sources_json JSON NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE,
+        KEY idx_chat_messages_session (session_id, id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
 

@@ -1,12 +1,18 @@
 import {Button, Card, Form, Input, Typography, theme, message} from "antd";
 import {UserOutlined, LockOutlined} from "@ant-design/icons";
 import {useLocation, useNavigate} from "react-router-dom";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {login} from "@/service/authService.ts";
-import {setAccessToken} from "@/service/token.ts";
+import {getAccessToken, setAccessToken} from "@/service/token.ts";
 import {RequestError} from "@/service/request.ts";
 
 const {Title, Text} = Typography;
+
+/** 仅允许站内相对路径，避免 //evil 开放重定向 */
+function safeReturnPath(to: string): string {
+    if (!to.startsWith("/") || to.startsWith("//")) return "/";
+    return to;
+}
 
 type LoginForm = { email: string; password: string };
 
@@ -17,11 +23,16 @@ export default function LoginPage() {
     const location = useLocation();
     const {token} = theme.useToken();
 
-    const from = (location.state as { from?: string } | null)?.from ?? "/";
+    const from = safeReturnPath((location.state as { from?: string } | null)?.from ?? "/");
+
+    useEffect(() => {
+        if (getAccessToken()) {
+            navigate(from, {replace: true});
+        }
+    }, [from, navigate]);
 
     const onFinish = async (values: LoginForm) => {
         setSubmitting(true);
-        console.log(values)
         try {
             const data = await login(values.email.trim(), values.password);
             setAccessToken(data.accessToken);

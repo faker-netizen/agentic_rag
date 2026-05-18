@@ -1,5 +1,6 @@
 import http from "@/service/request.ts";
-import {getAccessToken, setAccessToken} from "@/service/token.ts";
+import {apiBase, refreshAccessToken} from "@/service/authRefresh.ts";
+import {getAccessToken} from "@/service/token.ts";
 
 export type ChatSession = {
     id: number;
@@ -62,23 +63,6 @@ export type SendMessageResult = {
     sources: ChatSource[] | null;
 };
 
-function apiBase(): string {
-    return import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
-}
-
-async function refreshAccessToken(): Promise<boolean> {
-    const res = await fetch(`${apiBase()}/api/auth/refresh`, {
-        method: "POST",
-        credentials: "include",
-        headers: {"Content-Type": "application/json"},
-    });
-    if (!res.ok) return false;
-    const data = (await res.json()) as {accessToken?: string};
-    if (!data.accessToken) return false;
-    setAccessToken(data.accessToken);
-    return true;
-}
-
 async function readSse(
     body: ReadableStream<Uint8Array>,
     onEvent: (event: string, dataJson: string) => void
@@ -112,6 +96,8 @@ export type StreamChatHandlers = {
     onToken: (p: {text: string}) => void;
     /** 模型或落库失败时服务端推送；随后仍会 `onDone`（answer 为失败说明） */
     onError: (p: {message: string}) => void;
+    /** 用户中断生成时服务端可能推送 */
+    onAborted?: (p: {stopped?: boolean}) => void;
     onDone: (p: SendMessageResult) => void;
 };
 
@@ -152,7 +138,16 @@ export async function streamChatMessage(
 
         if (!res.ok || !res.body) {
             const t = await res.text().catch(() => "");
-            throw new Error(t || `请求失败(${res.status})`);
+            let errMsg = `请求失败(${res.status})`;
+            if (t) {
+                try {
+                    const j = JSON.parse(t) as {error?: string; message?: string};
+                    errMsg = j.error || j.message || errMsg;
+                } catch {
+                    errMsg = t;
+                }
+            }
+            throw new Error(errMsg);
         }
 
         await readSse(res.body, (event, dataStr) => {
@@ -167,6 +162,7 @@ export async function streamChatMessage(
                 handlers.onSources({sources: (data.sources as ChatSource[] | null) ?? null});
             else if (event === "token") handlers.onToken({text: String(data.text ?? "")});
             else if (event === "error") handlers.onError({message: String(data.message ?? "")});
+            else if (event === "aborted") handlers.onAborted?.({stopped: Boolean(data.stopped)});
             else if (event === "done") {
                 handlers.onDone({
                     userMessageId: Number(data.userMessageId),

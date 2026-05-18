@@ -6,6 +6,8 @@ import {Document} from "@langchain/core/documents";
 import {qwenConfig} from "../config/qwen.js";
 import pool from "../config/database.js";
 import {HumanMessage, AIMessage, SystemMessage, AIMessageChunk} from "@langchain/core/messages";
+import {invokeRagRetrievalGraph} from "../ragAgent/ragRetrievalGraph.js";
+import {truncateChatContent, type ChatTurn} from "../utils/chatHistory.js";
 
 export type RagChunkItem = {
     content: string;
@@ -53,6 +55,30 @@ function createLLM() {
         model: qwenConfig.chatModel,
         temperature: Number.isFinite(qwenConfig.temperature) ? qwenConfig.temperature : 0.2,
     });
+}
+
+export type RagChatHistory = ChatTurn[];
+
+function buildRagGenerationMessages(
+    query: string,
+    context: string,
+    history: RagChatHistory
+): (SystemMessage | HumanMessage | AIMessage)[] {
+    const msgs: (SystemMessage | HumanMessage | AIMessage)[] = [
+        new SystemMessage(
+            "你是专业文档问答助手。主要依据【参考上下文】回答【当前问题】。\n" +
+                "若用户为追问、对比或指代，可结合【对话历史】理解意图；技术细节须来自参考上下文或历史中助手已给出的、与文档一致的内容，不要编造。\n" +
+                "若参考上下文与历史仍不足以回答，明确说明信息不足。"
+        ),
+    ];
+    for (const h of history) {
+        if (h.role === "user") msgs.push(new HumanMessage(h.content));
+        else msgs.push(new AIMessage(truncateChatContent(h.content, 2000)));
+    }
+    msgs.push(
+        new HumanMessage(`【参考上下文】\n${context}\n\n【当前问题】\n${query}`)
+    );
+    return msgs;
 }
 
 class RAGService {
@@ -185,35 +211,45 @@ class RAGService {
 
     async answerWithRAG(
         query: string,
-        opts?: {documentId?: number; knowledgeBaseId?: number; userId?: number; k?: number; minScore?: number}
+        opts?: {
+            documentId?: number;
+            knowledgeBaseId?: number;
+            userId?: number;
+            k?: number;
+            minScore?: number;
+            /** 本轮之前的 user/assistant 轮次 */
+            history?: RagChatHistory;
+        }
     ): Promise<AnswerWithRagResult> {
         try {
-            const llm = createLLM();
-            const chunks = await this.retrieveRelevantChunks(query, opts);
-            if (!chunks.length) {
-                return {
-                    answer: "信息不足",
-                    chunks: [],
-                };
+            if (opts?.userId == null) {
+                return {answer: "信息不足", chunks: []};
             }
 
+            const history = opts.history ?? [];
+            const state = await invokeRagRetrievalGraph({
+                userQuery: query,
+                conversationHistory: history,
+                ragOpts: {
+                    userId: opts.userId,
+                    knowledgeBaseId: opts.knowledgeBaseId,
+                    documentId: opts.documentId,
+                    k: opts.k ?? 5,
+                    minScore: opts.minScore,
+                },
+            });
+
+            const chunks = state.chunks as RagChunkItem[];
+            if (!chunks.length || !state.evalResult?.sufficient) {
+                return {answer: "信息不足", chunks: []};
+            }
+
+            const llm = createLLM();
             const context = chunks
                 .map((c, i) => `片段${i + 1}(score=${c.score.toFixed(3)}):\n${c.content}`)
                 .join("\n\n");
 
-            const prompt = ChatPromptTemplate.fromMessages([
-                [
-                    "system",
-                    "你是专业文档问答助手。只能根据提供上下文回答；若信息不足，必须回答“信息不足”。不要编造。",
-                ],
-                ["human", "问题：{input}\n\n上下文：\n{context}"],
-            ]);
-
-            const messages = await prompt.formatMessages({
-                input: query,
-                context,
-            });
-
+            const messages = buildRagGenerationMessages(query, context, history);
             const resp = await llm.invoke(messages);
             const answer =
                 typeof resp.content === "string" ? resp.content : JSON.stringify(resp.content);
@@ -254,13 +290,32 @@ class RAGService {
             userId?: number;
             k?: number;
             minScore?: number;
+            history?: RagChatHistory;
             /** 中止时 LangChain / 底层 HTTP 会取消流式请求 */
             signal?: AbortSignal;
         }
     ): AsyncGenerator<RagStreamPart> {
-        const chunks = await this.retrieveRelevantChunks(query, opts);
+        if (opts?.userId == null) {
+            yield {type: "context", chunks: []};
+            yield {type: "token", text: "信息不足"};
+            return;
+        }
+        const history = opts?.history ?? [];
+        const state = await invokeRagRetrievalGraph({
+            userQuery: query,
+            conversationHistory: history,
+            ragOpts: {
+                userId: opts.userId,
+                knowledgeBaseId: opts.knowledgeBaseId,
+                documentId: opts.documentId,
+                k: opts.k ?? 5,
+                minScore: opts.minScore,
+                signal: opts?.signal,
+            },
+        });
+        const chunks = state.chunks as RagChunkItem[];
         yield {type: "context", chunks};
-        if (!chunks.length) {
+        if (!chunks.length || !state.evalResult?.sufficient) {
             yield {type: "token", text: "信息不足"};
             return;
         }
@@ -270,18 +325,7 @@ class RAGService {
             .map((c, i) => `片段${i + 1}(score=${c.score.toFixed(3)}):\n${c.content}`)
             .join("\n\n");
 
-        const prompt = ChatPromptTemplate.fromMessages([
-            [
-                "system",
-                "你是专业文档问答助手。只能根据提供上下文回答；若信息不足，必须回答“信息不足”。不要编造。",
-            ],
-            ["human", "问题：{input}\n\n上下文：\n{context}"],
-        ]);
-
-        const messages = await prompt.formatMessages({
-            input: query,
-            context,
-        });
+        const messages = buildRagGenerationMessages(query, context, history);
 
         try {
             const stream = await llm.stream(messages, {signal: opts?.signal});

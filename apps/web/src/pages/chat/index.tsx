@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from "react";
+import {memo, useCallback, useEffect, useRef, useState, type RefObject} from "react";
 import {
     Button,
     Empty,
@@ -36,6 +36,11 @@ import {
 } from "@/service/chatApi.ts";
 import {listKnowledgeBases, type KnowledgeBase} from "@/service/knowledgeBaseApi.ts";
 import {RequestError} from "@/service/request.ts";
+import MarkdownContent from "@/components/MarkdownContent";
+import {
+    StreamingPlainContent,
+    type StreamingPlainHandle,
+} from "@/components/MarkdownContent/StreamingPlainContent.tsx";
 
 const {Text, Title} = Typography;
 const {Sider, Content} = Layout;
@@ -68,6 +73,16 @@ export default function ChatPage() {
     const {token} = theme.useToken();
     const bottomRef = useRef<HTMLDivElement>(null);
     const streamAbortRef = useRef<AbortController | null>(null);
+    const streamBodyRef = useRef<StreamingPlainHandle | null>(null);
+    const scrollRafRef = useRef<number | null>(null);
+
+    const scheduleScrollToBottom = useCallback(() => {
+        if (scrollRafRef.current != null) return;
+        scrollRafRef.current = requestAnimationFrame(() => {
+            scrollRafRef.current = null;
+            bottomRef.current?.scrollIntoView({behavior: "smooth"});
+        });
+    }, []);
 
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -76,6 +91,8 @@ export default function ChatPage() {
     const [loadingSessions, setLoadingSessions] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [sending, setSending] = useState(false);
+    /** 正在流式输出的助手消息 id（临时负数 id 或落库后的 id） */
+    const [streamingAssistantId, setStreamingAssistantId] = useState<number | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
     const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
@@ -170,6 +187,7 @@ export default function ChatPage() {
         setSending(true);
         const tempUser = -Date.now();
         const tempAsst = tempUser - 1;
+        setStreamingAssistantId(tempAsst);
         const nowIso = new Date().toISOString();
         setMessages((prev) => [
             ...prev,
@@ -216,16 +234,13 @@ export default function ChatPage() {
                         );
                     },
                     onToken: ({text: delta}) => {
-                        setMessages((prev) =>
-                            prev.map((m) =>
-                                m.id === tempAsst ? {...m, content: m.content + delta} : m
-                            )
-                        );
+                        streamBodyRef.current?.append(delta);
                     },
                     onError: ({message: errMsg}) => {
                         message.warning(errMsg);
                     },
                     onDone: (r) => {
+                        setStreamingAssistantId(null);
                         setMessages((prev) =>
                             prev.map((m) =>
                                 m.id === tempAsst
@@ -257,6 +272,7 @@ export default function ChatPage() {
         } finally {
             streamAbortRef.current = null;
             setSending(false);
+            setStreamingAssistantId(null);
         }
     };
 
@@ -363,7 +379,23 @@ export default function ChatPage() {
                                     ) : (
                                         <Flex vertical gap={16}>
                                             {messages.map((m) => (
-                                                <MessageBubble key={m.id} message={m} />
+                                                <MessageBubble
+                                                    key={m.id}
+                                                    message={m}
+                                                    isStreaming={
+                                                        m.role === "assistant" &&
+                                                        streamingAssistantId != null &&
+                                                        m.id === streamingAssistantId
+                                                    }
+                                                    streamBodyRef={
+                                                        m.role === "assistant" &&
+                                                        streamingAssistantId != null &&
+                                                        m.id === streamingAssistantId
+                                                            ? streamBodyRef
+                                                            : undefined
+                                                    }
+                                                    onStreamAppend={scheduleScrollToBottom}
+                                                />
                                             ))}
                                             <div ref={bottomRef} />
                                         </Flex>
@@ -439,7 +471,17 @@ export default function ChatPage() {
     );
 }
 
-function MessageBubble({message}: {message: ChatMessage}) {
+const MessageBubble = memo(function MessageBubble({
+    message,
+    isStreaming = false,
+    streamBodyRef,
+    onStreamAppend,
+}: {
+    message: ChatMessage;
+    isStreaming?: boolean;
+    streamBodyRef?: RefObject<StreamingPlainHandle | null>;
+    onStreamAppend?: () => void;
+}) {
     const {token} = theme.useToken();
     const isUser = message.role === "user";
     const sources = message.role === "assistant" ? parseSources(message.sources_json) : [];
@@ -464,7 +506,13 @@ function MessageBubble({message}: {message: ChatMessage}) {
                         padding: "10px 14px",
                     }}
                 >
-                    <Text style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{message.content}</Text>
+                    {isUser ? (
+                        <Text style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{message.content}</Text>
+                    ) : isStreaming && streamBodyRef ? (
+                        <StreamingPlainContent ref={streamBodyRef} onAppend={onStreamAppend} />
+                    ) : (
+                        <MarkdownContent content={message.content} />
+                    )}
                     {sources.length > 0 && (
                         <div style={{marginTop: 8}}>
                             <Text type="secondary" style={{fontSize: 12}}>
@@ -482,4 +530,4 @@ function MessageBubble({message}: {message: ChatMessage}) {
             </Flex>
         </Flex>
     );
-}
+});

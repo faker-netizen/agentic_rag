@@ -38,6 +38,7 @@ function routesToMenuItems(routes: any[], parentPath = ""): ItemType[] {
                 key: fullPath, // 用 path 当 key，点击直接 navigate
                 icon: handle?.icon,
                 label: handle?.title,
+                order: handle?.order ?? 0,
                 children: children && children.length ? children : undefined,
             } as ItemType);
         } else {
@@ -46,8 +47,7 @@ function routesToMenuItems(routes: any[], parentPath = ""): ItemType[] {
         }
     }
 
-    // 排序（可选）
-    return items.sort((a: any, b: any) => (a?.order ?? 0) - (b?.order ?? 0));
+    return items.sort((a, b) => ((a as {order?: number}).order ?? 0) - ((b as {order?: number}).order ?? 0));
 }
 
 function RootLayout() {

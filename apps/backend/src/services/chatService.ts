@@ -151,6 +151,7 @@ class ChatService {
                     userId,
                     knowledgeBaseId: kbId,
                     k: 5,
+                    history: historyAsc,
                 });
                 answer = a;
                 const sourceIds = [...new Set(chunks.map((c) => c.metadata.documentId))];
@@ -239,6 +240,7 @@ class ChatService {
                     userId,
                     knowledgeBaseId: kbId,
                     k: 5,
+                    history: historyAsc,
                     signal,
                 })) {
                     if (part.type === "context") {

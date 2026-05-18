@@ -3,10 +3,12 @@ import RootLayout from "../layout/RootLayout.tsx";
 import Home from "../pages/home";
 import Login from "../pages/login";
 import NotFound from "../pages/notFound";
-import {DatabaseOutlined, HomeOutlined, MessageOutlined} from "@ant-design/icons";
+import {ApiOutlined, DatabaseOutlined, HomeOutlined, MessageOutlined, RobotOutlined} from "@ant-design/icons";
 import Chat from "@/pages/chat";
 import Typora from "@/pages/typora";
 import KnowledgeBasesPage from "@/pages/knowledge-bases";
+import RagPage from "@/pages/rag";
+import AgentPage from "@/pages/agent";
 import RequireAuth from "@/router/RequireAuth.tsx";
 
 export const router = createBrowserRouter([
@@ -39,9 +41,19 @@ export const router = createBrowserRouter([
                         handle: {title: "聊天", icon: <MessageOutlined />, menu: true, order: 3},
                     },
                     {
+                        path: "rag",
+                        element: <RagPage />,
+                        handle: {title: "RAG", icon: <ApiOutlined />, menu: true, order: 4},
+                    },
+                    {
+                        path: "agent",
+                        element: <AgentPage />,
+                        handle: {title: "Agent", icon: <RobotOutlined />, menu: true, order: 5},
+                    },
+                    {
                         path: "typora",
                         element: <Typora />,
-                        handle: {title: "markdown", icon: <HomeOutlined />, menu: true, order: 4},
+                        handle: {title: "markdown", icon: <HomeOutlined />, menu: true, order: 6},
                     },
                     {
                         path: "*",

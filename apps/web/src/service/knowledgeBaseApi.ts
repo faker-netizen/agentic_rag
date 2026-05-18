@@ -1,8 +1,7 @@
 import axios from "axios";
 import http from "@/service/request.ts";
+import {apiBase, refreshAccessToken} from "@/service/authRefresh.ts";
 import {getAccessToken} from "@/service/token.ts";
-
-const baseURL = () => import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
 export type KnowledgeBase = {
     id: number;
@@ -52,23 +51,55 @@ export async function deleteDocument(kbId: number, documentId: number): Promise<
     await http.delete<{success: boolean}>(`/api/knowledge-bases/${kbId}/documents/${documentId}`);
 }
 
-/** multipart 上传，不走 JSON 封装的 http.post */
-export async function uploadDocument(kbId: number, file: File, title?: string): Promise<number> {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("title", (title?.trim() || file.name).trim());
-    const token = getAccessToken();
-    const res = await axios.post<{success: boolean; documentId: number; message?: string}>(
-        `${baseURL()}/api/knowledge-bases/${kbId}/upload`,
-        form,
-        {
-            withCredentials: true,
-            timeout: 120_000,
-            headers: token ? {Authorization: `Bearer ${token}`} : {},
-        }
-    );
-    if (!res.data?.success || res.data.documentId == null) {
-        throw new Error(res.data?.message || "上传失败");
+function uploadErrorMessage(data: unknown, fallback: string): string {
+    if (data && typeof data === "object") {
+        const o = data as {error?: string; message?: string};
+        if (o.error) return o.error;
+        if (o.message) return o.message;
     }
-    return res.data.documentId;
+    return fallback;
+}
+
+/** multipart 上传，不走 JSON 封装的 http.post；401 时 refresh 后重试一次 */
+export async function uploadDocument(kbId: number, file: File, title?: string): Promise<number> {
+    const titleVal = (title?.trim() || file.name).trim();
+
+    const postOnce = () => {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("title", titleVal);
+        const token = getAccessToken();
+        return axios.post<{success: boolean; documentId: number; message?: string; error?: string}>(
+            `${apiBase()}/api/knowledge-bases/${kbId}/upload`,
+            form,
+            {
+                withCredentials: true,
+                timeout: 120_000,
+                headers: token ? {Authorization: `Bearer ${token}`} : {},
+            }
+        );
+    };
+
+    const parse = (data: {success?: boolean; documentId?: number; message?: string; error?: string}) => {
+        if (!data?.success || data.documentId == null) {
+            throw new Error(uploadErrorMessage(data, "上传失败"));
+        }
+        return data.documentId;
+    };
+
+    try {
+        const res = await postOnce();
+        return parse(res.data);
+    } catch (e) {
+        if (axios.isAxiosError(e) && e.response?.status === 401) {
+            const ok = await refreshAccessToken();
+            if (!ok) throw new Error("登录已过期，请重新登录");
+            const res = await postOnce();
+            return parse(res.data);
+        }
+        if (axios.isAxiosError(e)) {
+            throw new Error(uploadErrorMessage(e.response?.data, e.message || "上传失败"));
+        }
+        throw e;
+    }
 }

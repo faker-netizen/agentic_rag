@@ -22,7 +22,7 @@ export function VirtualList<T>({
                                }: VirtualListProps<T>) {
     const viewportRef = useRef<HTMLDivElement | null>(null)
     const rafIdRef = useRef<number | null>(null)
-
+    console.log(1)
     const [scrollTop, setScrollTop] = useState(0)
     const totalHeight = itemHeight * items.length
     const {start, end, offsetY} = useMemo(() => {
@@ -34,7 +34,8 @@ export function VirtualList<T>({
         return {
             start: s,
             end: e,
-            offsetY: s * itemHeight
+            offsetY: s * itemHeight,
+
         }
     }, [scrollTop, height, items.length, overscan, itemHeight])
     const visibleItems = useMemo(() => {
@@ -71,7 +72,7 @@ export function VirtualList<T>({
         >
             <div style={{height: totalHeight, position: 'relative'}}>
                 <div style={{
-                    position: 'absolute',
+                    position:"absolute",
                     left: 0,
                     top: 0,
                     right: 0,

@@ -240,8 +240,9 @@ class RAGService {
             });
 
             const chunks = state.chunks as RagChunkItem[];
-            if (!chunks.length || !state.evalResult?.sufficient) {
-                return {answer: "信息不足", chunks: []};
+            if (this.shouldUsePlainChatFallback({chunks, evalResult: state.evalResult})) {
+                const answer = await this.chatPlain(query, history, {ragFallback: true});
+                return {answer, chunks: []};
             }
 
             const llm = createLLM();
@@ -261,22 +262,32 @@ class RAGService {
         }
     }
 
-    /** 无知识库时的多轮纯对话（由 chat 层传入已落库的历史，不含本轮用户句） */
+    /** 无知识库时的多轮纯对话；ragFallback 表示知识库检索未命中后的兜底 */
     async chatPlain(
         userMessage: string,
-        history: Array<{role: "user" | "assistant"; content: string}>
+        history: Array<{role: "user" | "assistant"; content: string}>,
+        options?: {ragFallback?: boolean}
     ): Promise<string> {
         const llm = createLLM();
-        const msgs: (SystemMessage | HumanMessage | AIMessage)[] = [
-            new SystemMessage("你是友好、简洁的中文助手。回答要有帮助、可读。"),
-        ];
+        const systemText = options?.ragFallback
+            ? "你是友好、简洁的中文助手。当前知识库未检索到足够相关的文档片段，请结合【对话历史】与用户问题作答；" +
+              "不要编造文档或引用来源，可说明未在知识库中找到直接依据，再基于常识与上下文尽量有帮助地回复。"
+            : "你是友好、简洁的中文助手。回答要有帮助、可读。";
+        const msgs: (SystemMessage | HumanMessage | AIMessage)[] = [new SystemMessage(systemText)];
         for (const h of history) {
             if (h.role === "user") msgs.push(new HumanMessage(h.content));
-            else msgs.push(new AIMessage(h.content));
+            else msgs.push(new AIMessage(truncateChatContent(h.content, 2000)));
         }
         msgs.push(new HumanMessage(userMessage));
         const resp = await llm.invoke(msgs);
         return typeof resp.content === "string" ? resp.content : JSON.stringify(resp.content);
+    }
+
+    private shouldUsePlainChatFallback(state: {
+        chunks: RagChunkItem[];
+        evalResult?: {sufficient: boolean} | null;
+    }): boolean {
+        return !state.chunks.length || !state.evalResult?.sufficient;
     }
 
     /**
@@ -314,9 +325,13 @@ class RAGService {
             },
         });
         const chunks = state.chunks as RagChunkItem[];
-        yield {type: "context", chunks};
-        if (!chunks.length || !state.evalResult?.sufficient) {
-            yield {type: "token", text: "信息不足"};
+        yield {type: "context", chunks: this.shouldUsePlainChatFallback({chunks, evalResult: state.evalResult}) ? [] : chunks};
+        if (this.shouldUsePlainChatFallback({chunks, evalResult: state.evalResult})) {
+            for await (const delta of this.streamChatPlain(query, history, opts?.signal, {
+                ragFallback: true,
+            })) {
+                yield {type: "token", text: delta};
+            }
             return;
         }
 
@@ -343,15 +358,18 @@ class RAGService {
     async *streamChatPlain(
         userMessage: string,
         history: Array<{role: "user" | "assistant"; content: string}>,
-        signal?: AbortSignal
+        signal?: AbortSignal,
+        options?: {ragFallback?: boolean}
     ): AsyncGenerator<string> {
         const llm = createLLM();
-        const msgs: (SystemMessage | HumanMessage | AIMessage)[] = [
-            new SystemMessage("你是友好、简洁的中文助手。回答要有帮助、可读。"),
-        ];
+        const systemText = options?.ragFallback
+            ? "你是友好、简洁的中文助手。当前知识库未检索到足够相关的文档片段，请结合【对话历史】与用户问题作答；" +
+              "不要编造文档或引用来源，可说明未在知识库中找到直接依据，再基于常识与上下文尽量有帮助地回复。"
+            : "你是友好、简洁的中文助手。回答要有帮助、可读。";
+        const msgs: (SystemMessage | HumanMessage | AIMessage)[] = [new SystemMessage(systemText)];
         for (const h of history) {
             if (h.role === "user") msgs.push(new HumanMessage(h.content));
-            else msgs.push(new AIMessage(h.content));
+            else msgs.push(new AIMessage(truncateChatContent(h.content, 2000)));
         }
         msgs.push(new HumanMessage(userMessage));
         try {

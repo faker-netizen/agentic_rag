@@ -1,0 +1,35 @@
+/** 聊天页：消息列表区域占满剩余高度，内部虚拟列表滚动 */
+.chat-page-layout {
+    min-height: 0 !important;
+    overflow: hidden;
+}
+
+.chat-messages-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-messages-panel .chat-messages-spin.ant-spin-nested-loading {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-messages-panel .chat-messages-spin .ant-spin-container {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-message-virtual-list {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    overflow: auto;
+}

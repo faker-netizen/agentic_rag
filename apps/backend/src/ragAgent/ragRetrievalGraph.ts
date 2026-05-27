@@ -1,5 +1,5 @@
 /**
- * LangGraph：首轮不强制查询重写；多路召回；**LLM 评估**；不足则重写再检索，预算用尽则放弃。
+ * LangGraph：首轮不强制查询重写；多路召回；**LLM 评估**；不足则改写再检索一次，仍不足则交由上层走纯对话。
  * 不包含最终「生成答案」——由 ragService 在图结束后调用 LLM（支持流式）。
  */
 import {Annotation, END, START, StateGraph} from "@langchain/langgraph";
@@ -28,7 +28,8 @@ export type RagRetrievalRagOpts = {
     signal?: AbortSignal;
 };
 
-const MAX_RETRIEVAL_ATTEMPTS = 3;
+/** 首次检索 + 最多 1 次改写后再检索 */
+const MAX_RETRIEVAL_ATTEMPTS = 2;
 
 const EvalSchema = z.object({
     sufficient: z.boolean().describe("当前片段是否足以准确、完整地回答用户问题"),
@@ -79,7 +80,6 @@ async function prepareNode(state: RagRetrievalState): Promise<Partial<RagRetriev
             hist,
             state.ragOpts.signal
         );
-        console.log(standalone)
         return {queries: [standalone]};
     }
     return {queries: [state.userQuery]};
@@ -152,7 +152,6 @@ async function evaluateNode(state: RagRetrievalState): Promise<Partial<RagRetrie
     ]);
     const messages = await prompt.formatMessages({q: questionWithHistory(state), chunks: chunkText});
     const out = await llm.invoke(messages, {signal});
-    console.log(out)
     return {
         evalResult: {sufficient: out.sufficient, reason: out.reason ?? undefined},
     };
@@ -188,7 +187,10 @@ async function rewriteQueryNode(state: RagRetrievalState): Promise<Partial<RagRe
 
 async function giveupNode(state: RagRetrievalState): Promise<Partial<RagRetrievalState>> {
     void state;
-    return {chunks: [], evalResult: {sufficient: false, reason: "budget_exhausted"}};
+    return {
+        chunks: [],
+        evalResult: {sufficient: false, reason: "fallback_plain_chat"},
+    };
 }
 
 function routeAfterEval(state: RagRetrievalState): "ready" | "rewrite" | "giveup" {
@@ -233,7 +235,7 @@ export type RagRetrievalInvokeInput = {
 };
 
 /**
- * 运行检索子图：返回最终 chunks 与 eval；giveup 时 chunks 为空。
+ * 运行检索子图：返回最终 chunks 与 eval；不足时 chunks 为空，由 ragService 走纯对话兜底。
  */
 export async function invokeRagRetrievalGraph(input: RagRetrievalInvokeInput): Promise<RagRetrievalState> {
     const graph = getRetrievalGraph();

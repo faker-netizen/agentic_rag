@@ -1,7 +1,16 @@
 import axios from "axios";
+import {ChunkedUploadSDK, type ChunkedUploadTask} from "@d2c/utils";
 import http from "@/service/request.ts";
 import {apiBase, refreshAccessToken} from "@/service/authRefresh.ts";
 import {getAccessToken} from "@/service/token.ts";
+import {createKnowledgeBaseChunkUploadApi, fetchChunkUploadStatus} from "@/service/chunkUploadApi.ts";
+import {
+    fileMatchesPending,
+    listPendingUploadsForKb,
+    removePendingUpload,
+    savePendingUpload,
+    type PendingChunkUpload,
+} from "@/service/uploadSessionStorage.ts";
 
 export type KnowledgeBase = {
     id: number;
@@ -60,8 +69,148 @@ function uploadErrorMessage(data: unknown, fallback: string): string {
     return fallback;
 }
 
-/** multipart 上传，不走 JSON 封装的 http.post；401 时 refresh 后重试一次 */
-export async function uploadDocument(kbId: number, file: File, title?: string): Promise<number> {
+/** 演示用分片大小（1KB），便于观察多分片进度与断点续传 */
+export const UPLOAD_CHUNK_SIZE = 1024;
+
+/** 不超过该大小走直传；超过则走分片（演示时与分片大小对齐） */
+const SIMPLE_UPLOAD_MAX = UPLOAD_CHUNK_SIZE;
+
+export type ChunkedUploadHandle = {
+    task: ChunkedUploadTask;
+    documentIdPromise: Promise<number>;
+};
+
+export type {PendingChunkUpload};
+
+function persistPendingFromSession(kbId: number, file: File, title: string | undefined) {
+    return (info: {
+        fileId: string;
+        fileName: string;
+        fileSize: number;
+        chunkSize: number;
+        totalChunks: number;
+        fileHash?: string;
+    }) => {
+        savePendingUpload({
+            fileId: info.fileId,
+            kbId,
+            fileName: info.fileName,
+            fileSize: info.fileSize,
+            chunkSize: info.chunkSize,
+            totalChunks: info.totalChunks,
+            lastModified: file.lastModified,
+            title: title?.trim() || file.name,
+            fileHash: info.fileHash,
+            updatedAt: new Date().toISOString(),
+        });
+    };
+}
+
+/** 分片上传（断点续传 / 秒传 / 进度），返回 task 供 UI 绑定 */
+export function startChunkedDocumentUpload(
+    kbId: number,
+    file: File,
+    title?: string,
+    options?: {resumeFileId?: string}
+): ChunkedUploadHandle {
+    const api = createKnowledgeBaseChunkUploadApi(kbId, title);
+    let resolveId!: (id: number) => void;
+    let rejectId!: (reason?: unknown) => void;
+    const documentIdPromise = new Promise<number>((resolve, reject) => {
+        resolveId = resolve;
+        rejectId = reject;
+    });
+
+    const onSessionReady = persistPendingFromSession(kbId, file, title);
+
+    const sdk = new ChunkedUploadSDK(api);
+    const task = sdk.createTask(file, {
+        autoStart: false,
+        chunkSize: UPLOAD_CHUNK_SIZE,
+        resumeFileId: options?.resumeFileId,
+        biz: {title: title?.trim() || file.name},
+        onSessionReady,
+        onSuccess: (result, snap) => {
+            if (snap.fileId) removePendingUpload(snap.fileId);
+            if (result.documentId != null) resolveId(result.documentId);
+            else rejectId(new Error("上传完成但缺少 documentId"));
+        },
+        onError: (err, snap) => {
+            if (snap.fileId) onSessionReady({
+                fileId: snap.fileId,
+                fileName: file.name,
+                fileSize: file.size,
+                chunkSize: UPLOAD_CHUNK_SIZE,
+                totalChunks: Math.ceil(file.size / UPLOAD_CHUNK_SIZE),
+            });
+            rejectId(err);
+        },
+        onStatusChange: (status, snap) => {
+            if (status === "canceled" && snap.fileId) removePendingUpload(snap.fileId);
+        },
+    });
+    void task.start().catch(rejectId);
+    return {task, documentIdPromise};
+}
+
+/** 本地未完成上传列表（需配合服务端 status 校验） */
+export function getLocalPendingUploads(kbId: number): PendingChunkUpload[] {
+    return listPendingUploadsForKb(kbId);
+}
+
+export type PendingChunkUploadView = PendingChunkUpload & {
+    uploadedChunks: number;
+};
+
+/** 校验服务端任务仍有效，剔除已过期记录 */
+export async function syncPendingUploadsWithServer(kbId: number): Promise<PendingChunkUploadView[]> {
+    const local = listPendingUploadsForKb(kbId);
+    const valid: PendingChunkUploadView[] = [];
+    for (const p of local) {
+        try {
+            const status = await fetchChunkUploadStatus(kbId, p.fileId);
+            if (!status) {
+                removePendingUpload(p.fileId);
+                continue;
+            }
+            valid.push({
+                ...p,
+                uploadedChunks: status.uploadedChunkIndexes.length,
+            });
+        } catch {
+            valid.push({...p, uploadedChunks: 0});
+        }
+    }
+    return valid;
+}
+
+export async function cancelPendingUpload(kbId: number, fileId: string): Promise<void> {
+    const api = createKnowledgeBaseChunkUploadApi(kbId);
+    if (api.cancel) await api.cancel({fileId});
+    removePendingUpload(fileId);
+}
+
+/** 刷新后续传：需用户重新选择同一文件 */
+export function resumeChunkedDocumentUpload(
+    kbId: number,
+    file: File,
+    pending: PendingChunkUpload
+): ChunkedUploadHandle {
+    const mismatch = fileMatchesPending(file, pending);
+    if (mismatch) {
+        throw new Error(mismatch);
+    }
+    if (pending.chunkSize !== UPLOAD_CHUNK_SIZE) {
+        throw new Error("当前分片大小与未完成上传不一致，无法续传");
+    }
+    return startChunkedDocumentUpload(kbId, file, pending.title, {resumeFileId: pending.fileId});
+}
+
+export function discardPendingUpload(fileId: string): void {
+    removePendingUpload(fileId);
+}
+
+async function uploadDocumentSimple(kbId: number, file: File, title?: string): Promise<number> {
     const titleVal = (title?.trim() || file.name).trim();
 
     const postOnce = () => {
@@ -102,4 +251,13 @@ export async function uploadDocument(kbId: number, file: File, title?: string): 
         }
         throw e;
     }
+}
+
+/** 知识库文档上传：小文件直传，大文件分片 */
+export async function uploadDocument(kbId: number, file: File, title?: string): Promise<number> {
+    if (file.size <= SIMPLE_UPLOAD_MAX) {
+        return uploadDocumentSimple(kbId, file, title);
+    }
+    const {documentIdPromise} = startChunkedDocumentUpload(kbId, file, title);
+    return documentIdPromise;
 }

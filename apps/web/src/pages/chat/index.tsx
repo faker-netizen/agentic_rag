@@ -1,4 +1,4 @@
-import {memo, useCallback, useEffect, useRef, useState, type RefObject} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {
     Button,
     Empty,
@@ -19,10 +19,8 @@ import {
 import {
     DeleteOutlined,
     PlusOutlined,
-    RobotOutlined,
     SendOutlined,
     StopOutlined,
-    UserOutlined,
 } from "@ant-design/icons";
 import {
     createChatSession,
@@ -32,15 +30,14 @@ import {
     streamChatMessage,
     type ChatMessage,
     type ChatSession,
-    type ChatSource,
 } from "@/service/chatApi.ts";
 import {listKnowledgeBases, type KnowledgeBase} from "@/service/knowledgeBaseApi.ts";
 import {RequestError} from "@/service/request.ts";
-import MarkdownContent from "@/components/MarkdownContent";
-import {
-    StreamingPlainContent,
-    type StreamingPlainHandle,
-} from "@/components/MarkdownContent/StreamingPlainContent.tsx";
+import ChatMessageVirtualList, {
+    type ChatMessageVirtualListHandle,
+} from "@/components/ChatMessageVirtualList.tsx";
+import {useRafStreamBuffer} from "@/hooks/useRafStreamBuffer.ts";
+import "./chat.css";
 
 const {Text, Title} = Typography;
 const {Sider, Content} = Layout;
@@ -55,34 +52,21 @@ function isAbortError(e: unknown): boolean {
     return false;
 }
 
-function parseSources(raw: unknown): ChatSource[] {
-    if (raw == null) return [];
-    if (Array.isArray(raw)) return raw as ChatSource[];
-    if (typeof raw === "string") {
-        try {
-            const v = JSON.parse(raw) as unknown;
-            return Array.isArray(v) ? (v as ChatSource[]) : [];
-        } catch {
-            return [];
-        }
-    }
-    return [];
-}
-
 export default function ChatPage() {
     const {token} = theme.useToken();
-    const bottomRef = useRef<HTMLDivElement>(null);
+    const messageListRef = useRef<ChatMessageVirtualListHandle>(null);
     const streamAbortRef = useRef<AbortController | null>(null);
-    const streamBodyRef = useRef<StreamingPlainHandle | null>(null);
     const scrollRafRef = useRef<number | null>(null);
 
     const scheduleScrollToBottom = useCallback(() => {
         if (scrollRafRef.current != null) return;
         scrollRafRef.current = requestAnimationFrame(() => {
             scrollRafRef.current = null;
-            bottomRef.current?.scrollIntoView({behavior: "smooth"});
+            messageListRef.current?.scrollToBottom("auto");
         });
     }, []);
+
+    const streamBuffer = useRafStreamBuffer(scheduleScrollToBottom);
 
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -91,7 +75,6 @@ export default function ChatPage() {
     const [loadingSessions, setLoadingSessions] = useState(false);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [sending, setSending] = useState(false);
-    /** 正在流式输出的助手消息 id（临时负数 id 或落库后的 id） */
     const [streamingAssistantId, setStreamingAssistantId] = useState<number | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
@@ -135,10 +118,6 @@ export default function ChatPage() {
         if (selectedId != null) void loadMessages(selectedId);
         else setMessages([]);
     }, [selectedId, loadMessages]);
-
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({behavior: "smooth"});
-    }, [messages, sending]);
 
     const openCreate = async () => {
         setCreateOpen(true);
@@ -188,6 +167,7 @@ export default function ChatPage() {
         const tempUser = -Date.now();
         const tempAsst = tempUser - 1;
         setStreamingAssistantId(tempAsst);
+        streamBuffer.reset();
         const nowIso = new Date().toISOString();
         setMessages((prev) => [
             ...prev,
@@ -234,13 +214,13 @@ export default function ChatPage() {
                         );
                     },
                     onToken: ({text: delta}) => {
-                        streamBodyRef.current?.append(delta);
+                        streamBuffer.append(delta);
                     },
                     onError: ({message: errMsg}) => {
                         message.warning(errMsg);
                     },
                     onDone: (r) => {
-                        setStreamingAssistantId(null);
+                        streamBuffer.flush(r.answer);
                         setMessages((prev) =>
                             prev.map((m) =>
                                 m.id === tempAsst
@@ -255,6 +235,10 @@ export default function ChatPage() {
                                     : m
                             )
                         );
+                        requestAnimationFrame(() => {
+                            setStreamingAssistantId(null);
+                            streamBuffer.reset();
+                        });
                     },
                 },
                 {signal: ac.signal}
@@ -269,10 +253,11 @@ export default function ChatPage() {
                 message.error(errText(e));
                 await loadMessages(selectedId);
             }
+            setStreamingAssistantId(null);
+            streamBuffer.reset();
         } finally {
             streamAbortRef.current = null;
             setSending(false);
-            setStreamingAssistantId(null);
         }
     };
 
@@ -283,17 +268,35 @@ export default function ChatPage() {
     const selectedSession = sessions.find((s) => s.id === selectedId) ?? null;
 
     return (
-        <div style={{height: "calc(100vh - 64px - 48px)", minHeight: 420, display: "flex", flexDirection: "column"}}>
+        <div
+            style={{
+                height: "100%",
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+            }}
+        >
             <Title level={4} style={{marginTop: 0, flexShrink: 0}}>
                 会话
             </Title>
-            <Layout style={{flex: 1, minHeight: 0, background: token.colorBgContainer, borderRadius: token.borderRadiusLG}}>
+            <Layout
+                className="chat-page-layout"
+                style={{
+                    flex: 1,
+                    minHeight: 0,
+                    overflow: "hidden",
+                    background: token.colorBgContainer,
+                    borderRadius: token.borderRadiusLG,
+                }}
+            >
                 <Sider
                     width={280}
                     style={{
                         background: token.colorFillAlter,
                         borderRight: `1px solid ${token.colorBorderSecondary}`,
                         overflow: "auto",
+                        height: "100%",
                     }}
                 >
                     <div style={{padding: 12, borderBottom: `1px solid ${token.colorBorderSecondary}`}}>
@@ -353,7 +356,16 @@ export default function ChatPage() {
                         />
                     </Spin>
                 </Sider>
-                <Content style={{display: "flex", flexDirection: "column", minWidth: 0}}>
+                <Content
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        minWidth: 0,
+                        minHeight: 0,
+                        overflow: "hidden",
+                        height: "100%",
+                    }}
+                >
                     {!selectedId ? (
                         <Flex align="center" justify="center" style={{flex: 1}}>
                             <Empty description="请选择左侧会话或新建会话" />
@@ -372,34 +384,15 @@ export default function ChatPage() {
                                     <Tag style={{marginLeft: 8}}>RAG 知识库</Tag>
                                 )}
                             </div>
-                            <div style={{flex: 1, overflow: "auto", padding: 16}}>
-                                <Spin spinning={loadingMessages}>
-                                    {messages.length === 0 && !loadingMessages ? (
-                                        <Empty description="发送第一条消息开始聊天" />
-                                    ) : (
-                                        <Flex vertical gap={16}>
-                                            {messages.map((m) => (
-                                                <MessageBubble
-                                                    key={m.id}
-                                                    message={m}
-                                                    isStreaming={
-                                                        m.role === "assistant" &&
-                                                        streamingAssistantId != null &&
-                                                        m.id === streamingAssistantId
-                                                    }
-                                                    streamBodyRef={
-                                                        m.role === "assistant" &&
-                                                        streamingAssistantId != null &&
-                                                        m.id === streamingAssistantId
-                                                            ? streamBodyRef
-                                                            : undefined
-                                                    }
-                                                    onStreamAppend={scheduleScrollToBottom}
-                                                />
-                                            ))}
-                                            <div ref={bottomRef} />
-                                        </Flex>
-                                    )}
+                            <div className="chat-messages-panel">
+                                <Spin spinning={loadingMessages} style={{height:'100%'}} wrapperClassName="chat-messages-spin">
+                                    <ChatMessageVirtualList
+                                        ref={messageListRef}
+                                        messages={messages}
+                                        loading={loadingMessages}
+                                        streamingAssistantId={streamingAssistantId}
+                                        streamDisplay={streamBuffer.display}
+                                    />
                                 </Spin>
                             </div>
                             <div
@@ -470,64 +463,3 @@ export default function ChatPage() {
         </div>
     );
 }
-
-const MessageBubble = memo(function MessageBubble({
-    message,
-    isStreaming = false,
-    streamBodyRef,
-    onStreamAppend,
-}: {
-    message: ChatMessage;
-    isStreaming?: boolean;
-    streamBodyRef?: RefObject<StreamingPlainHandle | null>;
-    onStreamAppend?: () => void;
-}) {
-    const {token} = theme.useToken();
-    const isUser = message.role === "user";
-    const sources = message.role === "assistant" ? parseSources(message.sources_json) : [];
-
-    return (
-        <Flex justify={isUser ? "flex-end" : "flex-start"}>
-            <Flex gap={8} style={{maxWidth: "min(720px, 85%)"}} align="flex-start">
-                {!isUser && (
-                    <RobotOutlined
-                        style={{
-                            fontSize: 18,
-                            marginTop: 4,
-                            color: token.colorPrimary,
-                        }}
-                    />
-                )}
-                <div
-                    style={{
-                        background: isUser ? token.colorPrimaryBg : token.colorFillSecondary,
-                        border: `1px solid ${token.colorBorderSecondary}`,
-                        borderRadius: token.borderRadiusLG,
-                        padding: "10px 14px",
-                    }}
-                >
-                    {isUser ? (
-                        <Text style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{message.content}</Text>
-                    ) : isStreaming && streamBodyRef ? (
-                        <StreamingPlainContent ref={streamBodyRef} onAppend={onStreamAppend} />
-                    ) : (
-                        <MarkdownContent content={message.content} />
-                    )}
-                    {sources.length > 0 && (
-                        <div style={{marginTop: 8}}>
-                            <Text type="secondary" style={{fontSize: 12}}>
-                                引用：
-                            </Text>{" "}
-                            {sources.map((s) => (
-                                <Tag key={s.id} style={{marginTop: 4}}>
-                                    {s.title}
-                                </Tag>
-                            ))}
-                        </div>
-                    )}
-                </div>
-                {isUser && <UserOutlined style={{fontSize: 18, marginTop: 4, color: token.colorTextSecondary}} />}
-            </Flex>
-        </Flex>
-    );
-});

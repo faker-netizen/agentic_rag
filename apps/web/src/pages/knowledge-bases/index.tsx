@@ -1,5 +1,6 @@
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {
+    Alert,
     Button,
     Card,
     Col,
@@ -18,17 +19,25 @@ import {
 } from "antd";
 import type {ColumnsType} from "antd/es/table";
 import {DatabaseOutlined, DeleteOutlined, PlusOutlined, UploadOutlined} from "@ant-design/icons";
+import ChunkUploadModal from "@/components/ChunkUploadModal.tsx";
 import {
+    cancelPendingUpload,
     createKnowledgeBase,
     deleteDocument,
     deleteKnowledgeBase,
     listDocuments,
     listKnowledgeBases,
+    resumeChunkedDocumentUpload,
+    startChunkedDocumentUpload,
+    syncPendingUploadsWithServer,
+    UPLOAD_CHUNK_SIZE,
     uploadDocument,
     type KnowledgeBase,
     type KnowledgeBaseDocument,
+    type PendingChunkUploadView,
 } from "@/service/knowledgeBaseApi.ts";
 import {RequestError} from "@/service/request.ts";
+import type {ChunkedUploadTask, UploadTaskSnapshot} from "@d2c/utils";
 
 const {Title, Text} = Typography;
 
@@ -45,6 +54,13 @@ export default function KnowledgeBasesPage() {
     const [createOpen, setCreateOpen] = useState(false);
     const [createSubmitting, setCreateSubmitting] = useState(false);
     const [form] = Form.useForm<{name: string; description?: string}>();
+    const [chunkUploadOpen, setChunkUploadOpen] = useState(false);
+    const [chunkFileName, setChunkFileName] = useState("");
+    const [chunkTask, setChunkTask] = useState<ChunkedUploadTask | null>(null);
+    const [chunkSnapshot, setChunkSnapshot] = useState<UploadTaskSnapshot | null>(null);
+    const [pendingUploads, setPendingUploads] = useState<PendingChunkUploadView[]>([]);
+    const resumeInputRef = useRef<HTMLInputElement>(null);
+    const resumePendingRef = useRef<PendingChunkUploadView | null>(null);
 
     const loadKbs = useCallback(async () => {
         setLoadingKb(true);
@@ -84,6 +100,59 @@ export default function KnowledgeBasesPage() {
         if (selectedKb) void loadDocs(selectedKb.id);
         else setDocs([]);
     }, [selectedKb?.id, loadDocs]);
+
+    const refreshPendingUploads = useCallback(async (kbId: number) => {
+        try {
+            const list = await syncPendingUploadsWithServer(kbId);
+            setPendingUploads(list);
+        } catch {
+            setPendingUploads([]);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (selectedKb) void refreshPendingUploads(selectedKb.id);
+        else setPendingUploads([]);
+    }, [selectedKb?.id, refreshPendingUploads]);
+
+    const runChunkedUpload = useCallback(
+        async (kbId: number, file: File, pending?: PendingChunkUploadView) => {
+            const syncProgress = (task: ChunkedUploadTask) => {
+                setChunkSnapshot(task.getSnapshot());
+            };
+            const {task, documentIdPromise} = pending
+                ? resumeChunkedDocumentUpload(kbId, file, pending)
+                : startChunkedDocumentUpload(kbId, file);
+            const prev = {...task.options};
+            task.options.onProgress = (snap) => {
+                prev.onProgress?.(snap);
+                syncProgress(task);
+            };
+            task.options.onStatusChange = (st, snap) => {
+                prev.onStatusChange?.(st, snap);
+                syncProgress(task);
+            };
+            task.options.onSuccess = (r, snap) => {
+                prev.onSuccess?.(r, snap);
+                syncProgress(task);
+            };
+            task.options.onError = (err, snap) => {
+                prev.onError?.(err, snap);
+                syncProgress(task);
+            };
+            setChunkFileName(file.name);
+            setChunkTask(task);
+            setChunkSnapshot(task.getSnapshot());
+            setChunkUploadOpen(true);
+            await documentIdPromise;
+            message.success("上传成功");
+            setChunkUploadOpen(false);
+            setChunkTask(null);
+            await loadDocs(kbId);
+            await refreshPendingUploads(kbId);
+        },
+        [loadDocs, refreshPendingUploads]
+    );
 
     const handleCreateSubmit = async () => {
         try {
@@ -228,13 +297,18 @@ export default function KnowledgeBasesPage() {
                                     accept=".pdf,.doc,.docx,.txt,.md"
                                     beforeUpload={async (file) => {
                                         try {
-                                            await uploadDocument(selectedKb.id, file);
-                                            message.success("上传成功");
-                                            await loadDocs(selectedKb.id);
+                                            if (file.size <= UPLOAD_CHUNK_SIZE) {
+                                                await uploadDocument(selectedKb.id, file);
+                                                message.success("上传成功");
+                                                await loadDocs(selectedKb.id);
+                                            } else {
+                                                await runChunkedUpload(selectedKb.id, file);
+                                            }
                                         } catch (e) {
                                             message.error(
                                                 axiosLikeMsg(e) || (e instanceof Error ? e.message : "上传失败")
                                             );
+                                            if (selectedKb) void refreshPendingUploads(selectedKb.id);
                                         }
                                         return false;
                                     }}
@@ -249,7 +323,75 @@ export default function KnowledgeBasesPage() {
                         {!selectedKb ? (
                             <Empty description="请先在左侧选择一个知识库" />
                         ) : (
-                            <Table<KnowledgeBaseDocument>
+                            <>
+                                {pendingUploads.length > 0 ? (
+                                    <Space direction="vertical" style={{width: "100%", marginBottom: 16}}>
+                                        {pendingUploads.map((p) => (
+                                            <Alert
+                                                key={p.fileId}
+                                                type="warning"
+                                                showIcon
+                                                message={`未完成上传：${p.fileName}`}
+                                                description={`服务端已保存 ${p.uploadedChunks}/${p.totalChunks} 个分片，请选择同一文件继续上传`}
+                                                action={
+                                                    <Space>
+                                                        <Button
+                                                            size="small"
+                                                            type="primary"
+                                                            onClick={() => {
+                                                                resumePendingRef.current = p;
+                                                                resumeInputRef.current?.click();
+                                                            }}
+                                                        >
+                                                            继续上传
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            danger
+                                                            onClick={() => {
+                                                                void (async () => {
+                                                                    try {
+                                                                        await cancelPendingUpload(
+                                                                            selectedKb.id,
+                                                                            p.fileId
+                                                                        );
+                                                                        message.success("已取消未完成上传");
+                                                                        await refreshPendingUploads(selectedKb.id);
+                                                                    } catch (e) {
+                                                                        message.error(errMsg(e));
+                                                                    }
+                                                                })();
+                                                            }}
+                                                        >
+                                                            放弃
+                                                        </Button>
+                                                    </Space>
+                                                }
+                                            />
+                                        ))}
+                                    </Space>
+                                ) : null}
+                                <input
+                                    ref={resumeInputRef}
+                                    type="file"
+                                    accept=".pdf,.doc,.docx,.txt,.md"
+                                    style={{display: "none"}}
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        const pending = resumePendingRef.current;
+                                        e.target.value = "";
+                                        resumePendingRef.current = null;
+                                        if (!file || !pending || !selectedKb) return;
+                                        void runChunkedUpload(selectedKb.id, file, pending).catch((err) => {
+                                            message.error(
+                                                axiosLikeMsg(err) ||
+                                                    (err instanceof Error ? err.message : "续传失败")
+                                            );
+                                            void refreshPendingUploads(selectedKb.id);
+                                        });
+                                    }}
+                                />
+                                <Table<KnowledgeBaseDocument>
                                 size="small"
                                 rowKey="id"
                                 loading={loadingDocs}
@@ -258,10 +400,23 @@ export default function KnowledgeBasesPage() {
                                 pagination={{pageSize: 10, showSizeChanger: true}}
                                 locale={{emptyText: <Empty description="该知识库暂无文档" />}}
                             />
+                            </>
                         )}
                     </Card>
                 </Col>
             </Row>
+
+            <ChunkUploadModal
+                open={chunkUploadOpen}
+                fileName={chunkFileName}
+                snapshot={chunkSnapshot}
+                task={chunkTask}
+                onClose={() => {
+                    setChunkUploadOpen(false);
+                    setChunkTask(null);
+                    setChunkSnapshot(null);
+                }}
+            />
 
             <Modal
                 title="新建知识库"

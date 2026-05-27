@@ -40,16 +40,16 @@ export const router = createBrowserRouter([
                         element: <Chat />,
                         handle: {title: "聊天", icon: <MessageOutlined />, menu: true, order: 3},
                     },
-                    {
-                        path: "rag",
-                        element: <RagPage />,
-                        handle: {title: "RAG", icon: <ApiOutlined />, menu: true, order: 4},
-                    },
-                    {
-                        path: "agent",
-                        element: <AgentPage />,
-                        handle: {title: "Agent", icon: <RobotOutlined />, menu: true, order: 5},
-                    },
+                    // {
+                    //     path: "rag",
+                    //     element: <RagPage />,
+                    //     handle: {title: "RAG", icon: <ApiOutlined />, menu: true, order: 4},
+                    // },
+                    // {
+                    //     path: "agent",
+                    //     element: <AgentPage />,
+                    //     handle: {title: "Agent", icon: <RobotOutlined />, menu: true, order: 5},
+                    // },
                     {
                         path: "typora",
                         element: <Typora />,

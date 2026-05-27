@@ -10,7 +10,9 @@
     "dev": "concurrently -n web,backend -c blue,green \"pnpm -C apps/web dev\" \"pnpm -C apps/backend dev\""
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "tsdown": "^0.22.0",
+    "typescript": "^6.0.3"
   },
   "packageManager": "pnpm@10.28.1"
 }

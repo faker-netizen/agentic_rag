@@ -111,9 +111,11 @@ function RootLayout() {
                     </div>
                 </Header>
                 <Layout>
-                    <Sider>
+                    <Sider
+                    theme={'light'}
+                    >
                         <Menu
-                            theme="dark"
+                            theme="light"
                             mode="vertical"
                             items={menuItems}
                             selectedKeys={[selectedKey]}
@@ -127,7 +129,10 @@ function RootLayout() {
                                 background: colorBgContainer,
                                 borderRadius: borderRadiusLG,
                                 padding: 16,
-                                height: 'calc(100vh - 64px - 32px)', // header + content padding
+                                height: "calc(100vh - 64px - 32px)",
+                                overflow: "hidden",
+                                display: "flex",
+                                flexDirection: "column",
                             }}
                         >
                             <Outlet/>

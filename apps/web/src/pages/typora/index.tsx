@@ -21,7 +21,8 @@ export default function Typora() {
     return (
         <div style={{height: "100%"}}>
             <Button>111</Button>
-            <VirtualList items={items} height={400} itemHeight={400} overscan={1} renderItem={(item,index)=>{
+            <div style={{height:200}}>111</div>
+            <VirtualList items={items} height={300} itemHeight={110} overscan={1} renderItem={(item,index)=>{
                 return (<div>{item.data}{index}</div>)
             }}
             ></VirtualList>

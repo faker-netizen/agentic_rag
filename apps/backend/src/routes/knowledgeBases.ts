@@ -5,11 +5,14 @@ import {fileURLToPath} from 'url';
 import knowledgeBaseService from '../services/knowledgeBaseService.js';
 import documentService from '../services/documentService.js';
 import {decodeMultipartUtf8} from '../utils/multipartUtf8.js';
+import chunkUploadRoutes from './chunkUploads.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+router.use('/:kbId/uploads', chunkUploadRoutes);
 
 const storage = multer.diskStorage({
     destination: (_req, _file, cb) => {
@@ -36,7 +39,7 @@ const upload = multer({
             cb(new Error(`不支持的文件类型: ${ext}`));
         }
     },
-    limits: {fileSize: 10 * 1024 * 1024},
+    limits: {fileSize: 50 * 1024 * 1024},
 });
 
 function requireUserId(req: express.Request, res: express.Response): number | null {

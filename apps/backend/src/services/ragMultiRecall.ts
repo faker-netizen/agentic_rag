@@ -58,7 +58,7 @@ type EmbeddingRow = {
 };
 
 const RRF_K = 60;
-
+//构建查询sql中的动态参数 因为knowledgeBaseId和documentId是可选
 function buildScope(
     userId: number,
     knowledgeBaseId?: number,
@@ -77,6 +77,7 @@ function buildScope(
     return {where: parts.join(" AND "), args};
 }
 
+//从数据库中获取embedding rows
 async function fetchCandidates(
     userId: number,
     knowledgeBaseId: number | undefined,
@@ -122,6 +123,7 @@ export function extractKeywordTerms(query: string): string[] {
     return [...terms];
 }
 
+//关键词的出现比例分数
 function keywordScore(chunkText: string, terms: string[]): number {
     if (!terms.length) return 0;
     const t = chunkText.toLowerCase();
@@ -132,6 +134,7 @@ function keywordScore(chunkText: string, terms: string[]): number {
     return hit / terms.length;
 }
 
+//针对标题的关键词出现比例分数
 function titleMatchScore(title: string, query: string): number {
     const a = title.trim().toLowerCase();
     const b = query.trim().toLowerCase();
@@ -145,7 +148,7 @@ function titleMatchScore(title: string, query: string): number {
     }
     return hit / terms.length;
 }
-
+//把row信息转换成chunk结构
 function rowToChunk(row: EmbeddingRow, score: number): MultiRecallChunk {
     return {
         content: row.chunk_text,
@@ -153,7 +156,7 @@ function rowToChunk(row: EmbeddingRow, score: number): MultiRecallChunk {
         metadata: {documentId: row.document_id, embeddingId: row.id},
     };
 }
-
+//根据scoreFn计算候选rows的分数
 function rankByScoreDesc(
     rows: EmbeddingRow[],
     scoreFn: (row: EmbeddingRow) => number,
@@ -173,7 +176,7 @@ function rankByScoreDesc(
     }
     return out;
 }
-
+//向量相似计算rows分数
 function vectorRanked(
     rows: EmbeddingRow[],
     queryVec: number[],
@@ -197,7 +200,7 @@ function assignRanks(chunks: MultiRecallChunk[]): Map<number, number> {
     chunks.forEach((c, i) => m.set(c.metadata.embeddingId, i + 1));
     return m;
 }
-
+//rrf规则计算倒数排名分数
 function rrfFuse(
     ranksByPath: Map<RecallPathId, Map<number, number>>,
     idToChunk: Map<number, MultiRecallChunk>,
@@ -215,7 +218,7 @@ function rrfFuse(
     }
     return fused;
 }
-
+//基于权重的排名分数
 function weightedSumFuse(
     chunksByPath: Record<RecallPathId, MultiRecallChunk[]>,
     paths: RecallPathId[],
@@ -244,7 +247,7 @@ function weightedSumFuse(
     }
     return fused;
 }
-
+//默认加权系数
 function defaultWeights(): Record<RecallPathId, number> {
     return {vector: 0.55, keyword: 0.3, title: 0.15};
 }

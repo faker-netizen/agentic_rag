@@ -12,9 +12,8 @@ export type MarkdownContentProps = {
     style?: React.CSSProperties;
 };
 
-function MarkdownContentInner({content, className, style}: MarkdownContentProps) {
+export function MarkdownContentInner({content, className, style}: MarkdownContentProps) {
     const {token} = theme.useToken();
-
     const cssVars = useMemo(
         () =>
             ({

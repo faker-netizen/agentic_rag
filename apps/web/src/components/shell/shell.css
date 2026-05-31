@@ -1,0 +1,287 @@
+/* App backdrop — mesh gradient + optional grain */
+.app-backdrop {
+  min-height: 100vh;
+  padding: var(--space-window-gutter);
+  background-color: var(--color-bg-base);
+  background-image:
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(0, 122, 255, 0.08), transparent 50%),
+    radial-gradient(ellipse 60% 50% at 90% 80%, rgba(99, 102, 241, 0.06), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(255, 255, 255, 0.8), transparent 70%);
+  position: relative;
+}
+
+.app-backdrop::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+.app-backdrop > .window-shell {
+  position: relative;
+  z-index: 1;
+}
+
+/* Window shell */
+.window-shell {
+  height: calc(100vh - var(--space-window-gutter) * 2);
+  display: flex;
+  flex-direction: column;
+}
+
+.window-shell__frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-window);
+  border: 1px solid var(--color-border-glass);
+  background: var(--color-surface-glass);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  box-shadow: var(--shadow-window);
+  overflow: hidden;
+}
+
+.window-shell__titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+}
+
+.window-shell__traffic {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.window-shell__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+}
+
+.window-shell__dot--red {
+  background: #ff5f57;
+}
+
+.window-shell__dot--yellow {
+  background: #febc2e;
+}
+
+.window-shell__dot--green {
+  background: #28c840;
+}
+
+.window-shell__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+
+.window-shell__toolbar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.window-shell__path {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.window-shell__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.window-shell__layout {
+  flex: 1;
+  min-height: 0;
+  background: transparent !important;
+}
+
+.window-shell__sidebar {
+  border-right: 1px solid var(--color-border-subtle) !important;
+  background: rgba(255, 255, 255, 0.25) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.window-shell__content {
+  padding: var(--space-panel-md) !important;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent !important;
+}
+
+/* Glass surface variants */
+.glass-surface {
+  border: 1px solid var(--color-border-glass);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  transition: box-shadow var(--motion-base);
+}
+
+.glass-surface--panel {
+  background: var(--color-surface-glass-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.glass-surface--subtle {
+  background: var(--color-surface-glass-subtle);
+  border-radius: var(--radius-md);
+}
+
+.glass-surface--strong {
+  background: var(--color-surface-glass-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-panel);
+}
+
+.glass-surface--padding-none {
+  padding: 0;
+}
+
+.glass-surface--padding-sm {
+  padding: var(--space-panel-sm);
+}
+
+.glass-surface--padding-md {
+  padding: var(--space-panel-md);
+}
+
+.glass-surface--padding-lg {
+  padding: var(--space-panel-lg);
+}
+
+.glass-surface--flex {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Mac-style menu pills */
+.mac-menu.ant-menu-light {
+  background: transparent !important;
+  border-inline-end: none !important;
+  padding: 8px;
+}
+
+.mac-menu.ant-menu-light .ant-menu-item {
+  border-radius: var(--radius-sm) !important;
+  margin-inline: 0 !important;
+  width: 100%;
+  transition: background var(--motion-fast);
+}
+
+.mac-menu.ant-menu-light .ant-menu-item-selected {
+  background: rgba(0, 122, 255, 0.1) !important;
+  color: var(--color-accent) !important;
+  font-weight: 500;
+}
+
+.mac-menu.ant-menu-light .ant-menu-item:not(.ant-menu-item-selected):hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Display heading */
+.display-heading {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.display-heading--1 {
+  font-size: 2.5rem;
+  line-height: 1.15;
+}
+
+.display-heading--2 {
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+.display-heading--3 {
+  font-size: 1.5rem;
+  line-height: 1.25;
+}
+
+.display-heading--center {
+  text-align: center;
+}
+
+.display-heading__subtitle {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+  letter-spacing: normal;
+}
+
+/* Login page */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-panel-lg);
+}
+
+.login-page__card {
+  width: min(420px, 100%);
+  animation: login-enter 0.5s ease both;
+}
+
+.login-page__card-inner {
+  animation: login-stagger 0.6s ease 0.1s both;
+}
+
+@keyframes login-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes login-stagger {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -1,0 +1,46 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap");
+
+:root {
+  /* Color — neutral base + single accent */
+  --color-bg-base: #f4f4f5;
+  --color-accent: #007aff;
+  --color-accent-hover: #0066d6;
+  --color-text-primary: rgba(0, 0, 0, 0.88);
+  --color-text-secondary: rgba(0, 0, 0, 0.55);
+  --color-text-tertiary: rgba(0, 0, 0, 0.38);
+
+  /* Glass surfaces */
+  --color-surface-glass: rgba(255, 255, 255, 0.72);
+  --color-surface-glass-strong: rgba(255, 255, 255, 0.85);
+  --color-surface-glass-subtle: rgba(255, 255, 255, 0.45);
+  --color-border-glass: rgba(255, 255, 255, 0.55);
+  --color-border-subtle: rgba(0, 0, 0, 0.06);
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-window: 20px;
+
+  /* Effects */
+  --blur-glass: 20px;
+  --shadow-window: 0 24px 64px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  /* Typography */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+
+  /* Spacing */
+  --space-window-gutter: 16px;
+  --space-panel-sm: 12px;
+  --space-panel-md: 16px;
+  --space-panel-lg: 24px;
+
+  /* Motion */
+  --motion-fast: 150ms ease;
+  --motion-base: 200ms ease;
+}

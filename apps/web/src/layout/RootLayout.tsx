@@ -1,13 +1,13 @@
-import React from 'react';
+import React, {useMemo, useState} from "react";
 import {Outlet, useLocation, useMatches, useNavigate} from "react-router-dom";
-import {Button, Layout, Menu, type MenuProps, theme, Typography} from "antd";
-import {HomeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, UserOutlined} from "@ant-design/icons";
-import {useMemo, useState} from "react";
-import type { ItemType } from "antd/es/menu/interface";
+import {Button, Layout, Menu, type MenuProps} from "antd";
+import {MenuFoldOutlined, MenuUnfoldOutlined} from "@ant-design/icons";
+import type {ItemType} from "antd/es/menu/interface";
 import {router} from "@/router";
 import {clearAuth} from "@/service/token.ts";
+import {GlassSurface, WindowShell} from "@/components/shell";
 
-const {Header, Content, Footer, Sider} = Layout
+const {Content, Sider} = Layout;
 
 type Handle = {
     title?: string;
@@ -15,8 +15,6 @@ type Handle = {
     menu?: boolean;
     order?: number;
 };
-const {Title} = Typography
-
 
 function routesToMenuItems(routes: any[], parentPath = ""): ItemType[] {
     const items: ItemType[] = [];
@@ -25,7 +23,6 @@ function routesToMenuItems(routes: any[], parentPath = ""): ItemType[] {
         const handle: Handle | undefined = r.handle;
         const show = handle?.menu !== false && !!handle?.title;
 
-        // 计算完整路径：index 用 parentPath；子路由 path 用拼接
         const fullPath =
             r.index ? (parentPath || "/") :
                 r.path?.startsWith("/") ? r.path :
@@ -35,15 +32,14 @@ function routesToMenuItems(routes: any[], parentPath = ""): ItemType[] {
 
         if (show) {
             items.push({
-                key: fullPath, // 用 path 当 key，点击直接 navigate
+                key: fullPath,
                 icon: handle?.icon,
                 label: handle?.title,
                 order: handle?.order ?? 0,
                 children: children && children.length ? children : undefined,
             } as ItemType);
-        } else {
-            // 不显示在菜单，但它的 children 可能需要显示（可选策略）
-            if (children?.length) items.push(...children);
+        } else if (children?.length) {
+            items.push(...children);
         }
     }
 
@@ -51,56 +47,37 @@ function routesToMenuItems(routes: any[], parentPath = ""): ItemType[] {
 }
 
 function RootLayout() {
-    const [collapsed, setCollapsed] = useState(false)
-    const navigate = useNavigate()
-    const location = useLocation()
+    const [collapsed, setCollapsed] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
     const matches = useMatches();
-    const menuItems = useMemo(() => {
-        // router.routes 是 Data Router 暴露的路由树
-        return routesToMenuItems((router as any).routes, "");
-    }, []);
-    const {
-        token: {colorBgContainer, borderRadiusLG},
-    } = theme.useToken()
 
-    // 用 matches 找到“最后一个有 title/menu 的路由”，作为选中项
+    const menuItems = useMemo(() => routesToMenuItems((router as any).routes, ""), []);
+
     const selectedKey = useMemo(() => {
-        const last = [...matches].reverse().find(m => {
+        const last = [...matches].reverse().find((m) => {
             const h = m.handle as Handle | undefined;
             return h?.menu !== false && h?.title;
         });
-        // last?.pathname 会是匹配到的实际 pathname（index 情况也OK）
         return last?.pathname ?? location.pathname;
     }, [matches, location.pathname]);
 
-
     return (
-            <Layout>
-                <Header
-                    style={{
-                        padding: '0 16px',
-                        background: colorBgContainer,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        position: 'sticky',
-                        top: 0,
-                        zIndex: 10,
-                        borderBottom: '1px solid rgba(0,0,0,0.06)',
-                    }}
-                >
-                    <Button
-                        type="text"
-                        onClick={() => setCollapsed((v) => !v)}
-                        icon={collapsed ? <MenuUnfoldOutlined/> : <MenuFoldOutlined/>}
-                    />
-                    <div style={{fontWeight: 600}}>Admin</div>
-                    <div style={{marginLeft: 'auto', opacity: 0.7}}>
-                        {location.pathname}
-                    </div>
-                    <div>
+        <div className="app-backdrop">
+            <WindowShell
+                title="Design to Code"
+                toolbar={
+                    <>
+                        <Button
+                            type="text"
+                            size="small"
+                            onClick={() => setCollapsed((v) => !v)}
+                            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                        />
+                        <span className="window-shell__path">{location.pathname}</span>
                         <Button
                             type="primary"
+                            size="small"
                             onClick={() => {
                                 clearAuth();
                                 navigate("/login", {replace: true});
@@ -108,40 +85,37 @@ function RootLayout() {
                         >
                             登出
                         </Button>
-                    </div>
-                </Header>
-                <Layout>
+                    </>
+                }
+            >
+                <Layout className="window-shell__layout">
                     <Sider
-                    theme={'light'}
+                        theme="light"
+                        collapsible
+                        collapsed={collapsed}
+                        trigger={null}
+                        width={220}
+                        className="window-shell__sidebar"
                     >
                         <Menu
+                            className="mac-menu"
                             theme="light"
-                            mode="vertical"
+                            mode="inline"
                             items={menuItems}
                             selectedKeys={[selectedKey]}
                             onClick={(e) => navigate(e.key)}
                         />
                     </Sider>
 
-                    <Content style={{padding: 16}}>
-                        <div
-                            style={{
-                                background: colorBgContainer,
-                                borderRadius: borderRadiusLG,
-                                padding: 16,
-                                height: "calc(100vh - 64px - 32px)",
-                                overflow: "hidden",
-                                display: "flex",
-                                flexDirection: "column",
-                            }}
-                        >
-                            <Outlet/>
-                        </div>
+                    <Content className="window-shell__content">
+                        <GlassSurface variant="panel" padding="none" flex>
+                            <Outlet />
+                        </GlassSurface>
                     </Content>
                 </Layout>
-            </Layout>
-
-    )
+            </WindowShell>
+        </div>
+    );
 }
 
-export default RootLayout
+export default RootLayout;

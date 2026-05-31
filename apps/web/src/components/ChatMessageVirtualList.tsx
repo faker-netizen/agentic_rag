@@ -34,6 +34,8 @@ const ChatMessageVirtualList = forwardRef<ChatMessageVirtualListHandle, ChatMess
     ) {
         const scrollRef = useRef<HTMLDivElement>(null);
 
+        // TanStack Virtual returns non-memoizable functions; safe for this scroll list.
+        // eslint-disable-next-line react-hooks/incompatible-library -- intentional useVirtualizer
         const virtualizer = useVirtualizer({
             count: messages.length,
             getScrollElement: () => scrollRef.current,
@@ -66,13 +68,10 @@ const ChatMessageVirtualList = forwardRef<ChatMessageVirtualListHandle, ChatMess
         if (messages.length === 0 && !loading) {
             return (
                 <div
-                    className={["chat-message-virtual-list", className].filter(Boolean).join(" ")}
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        ...style,
-                    }}
+                    className={["chat-message-virtual-list", "chat-message-virtual-list--empty", className]
+                        .filter(Boolean)
+                        .join(" ")}
+                    style={style}
                 >
                     <Empty description="发送第一条消息开始聊天" />
                 </div>
@@ -83,7 +82,7 @@ const ChatMessageVirtualList = forwardRef<ChatMessageVirtualListHandle, ChatMess
             <div
                 ref={scrollRef}
                 className={["chat-message-virtual-list", className].filter(Boolean).join(" ")}
-                style={{padding: 16, ...style}}
+                style={style}
             >
                 <div
                     style={{

@@ -73,9 +73,11 @@ export default function Home() {
     console.log(decodeString("3[z]2[2[y]pq4[2[jk]e1[f]]]ef"))
     console.log('zzzyypqjkjkefjkjkefjkjkefjkjkefyypqjkjkefjkjkefjkjkefjkjkefef'=='zzzyypqjkjkefjkjkefjkjkefjkjkefyypqjkjkefjkjkefjkjkefjkjkefef')
     return (
-        <Card>
-            <Title level={2} style={{marginTop: 0}}>Home</Title>
-            <Paragraph>这是首页。接下来可以把 Todo 列表接到 RTK Query。</Paragraph>
-        </Card>
+        <div style={{padding: 16}}>
+            <Card>
+                <Title level={2} style={{marginTop: 0}}>Home</Title>
+                <Paragraph>这是首页。接下来可以把 Todo 列表接到 RTK Query。</Paragraph>
+            </Card>
+        </div>
     )
 }

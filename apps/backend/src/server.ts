@@ -20,13 +20,34 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+/** dev / preview：5173=vite dev，4173=vite preview */
+const DEFAULT_DEV_ORIGINS = ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:4174'];
+
+function parseCorsOrigins(): string[] {
+    const raw = process.env.CORS_ORIGIN;
+    if (raw) {
+        return raw.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    return DEFAULT_DEV_ORIGINS;
+}
+
+const allowedOrigins = parseCorsOrigins();
+
 // 中间件
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true,
-}));
+app.use(
+    cors({
+        origin(origin, callback) {
+            if (!origin || allowedOrigins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error(`CORS blocked origin: ${origin}`));
+            }
+        },
+        credentials: true,
+    })
+);
 
 // 健康检查
 app.get('/health', (req, res) => {
@@ -65,6 +86,7 @@ async function startServer() {
     // 启动服务器
     app.listen(PORT, () => {
       console.log(`服务器运行在 http://localhost:${PORT}`);
+      console.log(`CORS allowed origins: ${allowedOrigins.join(', ')}`);
       console.log(`健康检查: http://localhost:${PORT}/health`);
       console.log(`知识库与文档API: http://localhost:${PORT}/api/knowledge-bases`);
       console.log(`RAG API: http://localhost:${PORT}/api/rag`);

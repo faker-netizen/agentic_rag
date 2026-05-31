@@ -1,0 +1,316 @@
+/* MacBook desktop shell */
+
+.desktop {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #2d4a6f;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 15% 25%, rgba(0, 122, 255, 0.35), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 85% 80%, rgba(147, 51, 234, 0.28), transparent 50%),
+    radial-gradient(ellipse 90% 70% at 50% 100%, rgba(15, 23, 42, 0.5), transparent 60%),
+    linear-gradient(165deg, #3d5a80 0%, #1e293b 45%, #0f172a 100%);
+  background-size: cover;
+  background-position: center;
+}
+
+.desktop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Menu bar */
+.desktop-menubar {
+  position: relative;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 28px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 13px;
+}
+
+.desktop-menubar__brand {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.desktop-menubar__spacer {
+  flex: 1;
+}
+
+.desktop-menubar__action {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.desktop-menubar__action:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Desktop surface + icons */
+.desktop-surface {
+  position: absolute;
+  inset: 28px 0 88px;
+  z-index: 1;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.desktop-icons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px 24px;
+  max-height: 100%;
+  pointer-events: auto;
+}
+
+.desktop-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 88px;
+  padding: 8px 4px;
+  border-radius: var(--radius-sm);
+  cursor: default;
+  opacity: 0.85;
+  transition: background var(--motion-fast);
+}
+
+.desktop-icon:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.desktop-icon__glyph {
+  font-size: 40px;
+  color: rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+
+.desktop-icon__label {
+  font-size: 12px;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  line-height: 1.2;
+}
+
+/* Window layer */
+.window-layer {
+  position: absolute;
+  inset: 28px 0 88px;
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* Floating app window */
+.app-window {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  transition: box-shadow var(--motion-base);
+}
+
+.app-window--focused .app-window__frame {
+  box-shadow:
+    0 32px 80px rgba(0, 0, 0, 0.35),
+    0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.app-window:not(.app-window--focused) .app-window__frame {
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+}
+
+.app-window__frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-window);
+  border: 1px solid var(--color-border-glass);
+  background: var(--color-surface-glass-strong);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  overflow: hidden;
+}
+
+.app-window__titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.app-window__traffic {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.app-window__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  padding: 0;
+}
+
+button.app-window__dot {
+  cursor: pointer;
+}
+
+button.app-window__dot:hover {
+  filter: brightness(0.92);
+}
+
+.app-window__dot--red {
+  background: #ff5f57;
+}
+
+.app-window__dot--yellow {
+  background: #febc2e;
+}
+
+.app-window__dot--green {
+  background: #28c840;
+}
+
+.app-window__title {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-right: 52px;
+}
+
+.app-window__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.app-window__loading,
+.app-window__placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+}
+
+/* Dock */
+.desktop-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  z-index: 300;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.desktop-dock__inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+}
+
+.desktop-dock__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px 4px;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform var(--motion-fast), background var(--motion-fast);
+  min-width: 64px;
+}
+
+.desktop-dock__item:hover {
+  transform: translateY(-6px) scale(1.06);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.desktop-dock__item--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.desktop-dock__item--disabled:hover {
+  transform: none;
+  background: transparent;
+}
+
+.desktop-dock__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 240, 245, 0.95) 100%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  font-size: 24px;
+  color: var(--color-accent);
+}
+
+.desktop-dock__item--disabled .desktop-dock__icon {
+  color: var(--color-text-secondary);
+}
+
+.desktop-dock__label {
+  font-size: 11px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+
+.desktop-dock__dot {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+}

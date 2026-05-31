@@ -2,18 +2,14 @@ import {useCallback, useEffect, useRef, useState} from "react";
 import {
     Button,
     Empty,
-    Flex,
     Form,
     Input,
     Layout,
-    List,
     Modal,
     Popconfirm,
     Select,
     Spin,
     Tag,
-    Typography,
-    theme,
     message,
 } from "antd";
 import {
@@ -39,8 +35,7 @@ import ChatMessageVirtualList, {
 import {useRafStreamBuffer} from "@/hooks/useRafStreamBuffer.ts";
 import "./chat.css";
 
-const {Text, Title} = Typography;
-const {Sider, Content} = Layout;
+const {Content, Sider} = Layout;
 
 function errText(e: unknown): string {
     return e instanceof RequestError ? e.message : "操作失败，请稍后重试";
@@ -53,7 +48,6 @@ function isAbortError(e: unknown): boolean {
 }
 
 export default function ChatPage() {
-    const {token} = theme.useToken();
     const messageListRef = useRef<ChatMessageVirtualListHandle>(null);
     const streamAbortRef = useRef<AbortController | null>(null);
     const scrollRafRef = useRef<number | null>(null);
@@ -268,146 +262,103 @@ export default function ChatPage() {
     const selectedSession = sessions.find((s) => s.id === selectedId) ?? null;
 
     return (
-        <div
-            style={{
-                height: "100%",
-                minHeight: 0,
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-            }}
-        >
-            <Title level={4} style={{marginTop: 0, flexShrink: 0}}>
-                会话
-            </Title>
-            <Layout
-                className="chat-page-layout"
-                style={{
-                    flex: 1,
-                    minHeight: 0,
-                    overflow: "hidden",
-                    background: token.colorBgContainer,
-                    borderRadius: token.borderRadiusLG,
-                }}
-            >
-                <Sider
-                    width={280}
-                    style={{
-                        background: token.colorFillAlter,
-                        borderRight: `1px solid ${token.colorBorderSecondary}`,
-                        overflow: "auto",
-                        height: "100%",
-                    }}
-                >
-                    <div style={{padding: 12, borderBottom: `1px solid ${token.colorBorderSecondary}`}}>
+        <div className="chat-page">
+            <Layout className="chat-page-layout" style={{height: "100%"}}>
+                <Sider width={280} theme="light" className="chat-sidebar" style={{height: "100%"}}>
+                    <div className="chat-sidebar__header">
                         <Button type="primary" icon={<PlusOutlined />} block onClick={openCreate}>
                             新建会话
                         </Button>
                     </div>
-                    <Spin spinning={loadingSessions}>
-                        <List
-                            size="small"
-                            dataSource={sessions}
-                            locale={{emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无会话" />}}
-                            renderItem={(item) => (
-                                <List.Item
-                                    style={{
-                                        cursor: "pointer",
-                                        paddingInline: 12,
-                                        background: selectedId === item.id ? "rgba(22, 119, 255, 0.12)" : undefined,
-                                    }}
-                                    onClick={() => setSelectedId(item.id)}
-                                    actions={[
-                                        <Popconfirm
-                                            key="del"
-                                            title="删除该会话及全部消息？"
-                                            onConfirm={() => void onDeleteSession(item.id)}
-                                        >
-                                            <Button
-                                                type="text"
-                                                size="small"
-                                                danger
-                                                icon={<DeleteOutlined />}
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
-                                        </Popconfirm>,
-                                    ]}
-                                >
-                                    <List.Item.Meta
-                                        title={
-                                            <Text ellipsis style={{maxWidth: 200}}>
-                                                {item.title}
-                                            </Text>
-                                        }
-                                        description={
-                                            item.knowledge_base_id != null ? (
-                                                <Text type="secondary" style={{fontSize: 12}}>
-                                                    知识库 #{item.knowledge_base_id}
-                                                </Text>
-                                            ) : (
-                                                <Text type="secondary" style={{fontSize: 12}}>
-                                                    纯对话
-                                                </Text>
-                                            )
-                                        }
-                                    />
-                                </List.Item>
+                    <Spin spinning={loadingSessions} wrapperClassName="chat-sidebar__spin">
+                        <div className="chat-session-list">
+                            {sessions.length === 0 && !loadingSessions ? (
+                                <Empty
+                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                    description="暂无会话"
+                                    style={{marginTop: 24}}
+                                />
+                            ) : (
+                                sessions.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className={[
+                                            "chat-session-item",
+                                            selectedId === item.id && "chat-session-item--selected",
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" ")}
+                                        onClick={() => setSelectedId(item.id)}
+                                    >
+                                        <div className="chat-session-item__body">
+                                            <div className="chat-session-item__title">{item.title}</div>
+                                            <div className="chat-session-item__desc">
+                                                {item.knowledge_base_id != null
+                                                    ? `知识库 #${item.knowledge_base_id}`
+                                                    : "纯对话"}
+                                            </div>
+                                        </div>
+                                        <div className="chat-session-item__actions">
+                                            <Popconfirm
+                                                title="删除该会话及全部消息？"
+                                                onConfirm={() => void onDeleteSession(item.id)}
+                                            >
+                                                <Button
+                                                    type="text"
+                                                    size="small"
+                                                    danger
+                                                    icon={<DeleteOutlined />}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            </Popconfirm>
+                                        </div>
+                                    </div>
+                                ))
                             )}
-                        />
+                        </div>
                     </Spin>
                 </Sider>
-                <Content
-                    style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        minWidth: 0,
-                        minHeight: 0,
-                        overflow: "hidden",
-                        height: "100%",
-                    }}
-                >
+
+                <Content className="chat-main">
                     {!selectedId ? (
-                        <Flex align="center" justify="center" style={{flex: 1}}>
-                            <Empty description="请选择左侧会话或新建会话" />
-                        </Flex>
+                        <div className="chat-main__empty">
+                            <h2 className="chat-main__empty-title">开始对话</h2>
+                            <p className="chat-main__empty-desc">选择左侧会话，或新建一个开始聊天</p>
+                        </div>
                     ) : (
                         <>
-                            <div
-                                style={{
-                                    padding: "10px 16px",
-                                    borderBottom: `1px solid ${token.colorBorderSecondary}`,
-                                    flexShrink: 0,
-                                }}
-                            >
-                                <Text strong>{selectedSession?.title ?? "会话"}</Text>
+                            <div className="chat-main__header">
+                                <span className="chat-main__title">{selectedSession?.title ?? "会话"}</span>
                                 {selectedSession?.knowledge_base_id != null && (
-                                    <Tag style={{marginLeft: 8}}>RAG 知识库</Tag>
+                                    <Tag style={{marginLeft: 8}} color="blue">
+                                        RAG 知识库
+                                    </Tag>
                                 )}
                             </div>
+
                             <div className="chat-messages-panel">
-                                <Spin spinning={loadingMessages} style={{height:'100%'}} wrapperClassName="chat-messages-spin">
-                                    <ChatMessageVirtualList
-                                        ref={messageListRef}
-                                        messages={messages}
-                                        loading={loadingMessages}
-                                        streamingAssistantId={streamingAssistantId}
-                                        streamDisplay={streamBuffer.display}
-                                    />
-                                </Spin>
+                                {loadingMessages && (
+                                    <div className="chat-messages-panel__loading">
+                                        <Spin />
+                                    </div>
+                                )}
+                                <ChatMessageVirtualList
+                                    ref={messageListRef}
+                                    messages={messages}
+                                    loading={loadingMessages}
+                                    streamingAssistantId={streamingAssistantId}
+                                    streamDisplay={streamBuffer.display}
+                                />
                             </div>
-                            <div
-                                style={{
-                                    padding: 12,
-                                    borderTop: `1px solid ${token.colorBorderSecondary}`,
-                                    flexShrink: 0,
-                                }}
-                            >
-                                <Flex gap={8}>
+
+                            <div className="chat-composer-wrap">
+                                <div className="chat-composer">
                                     <Input.TextArea
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
                                         placeholder="输入消息，Enter 发送（Shift+Enter 换行）"
                                         autoSize={{minRows: 1, maxRows: 6}}
+                                        variant="borderless"
                                         onPressEnter={(e) => {
                                             if (!e.shiftKey) {
                                                 e.preventDefault();
@@ -416,23 +367,27 @@ export default function ChatPage() {
                                         }}
                                         disabled={sending}
                                     />
-                                    <Button
-                                        danger
-                                        icon={<StopOutlined />}
-                                        disabled={!sending}
-                                        onClick={() => onStopStream()}
-                                    >
-                                        停止
-                                    </Button>
-                                    <Button
-                                        type="primary"
-                                        icon={<SendOutlined />}
-                                        loading={sending}
-                                        onClick={() => void onSend()}
-                                    >
-                                        发送
-                                    </Button>
-                                </Flex>
+                                    <div className="chat-composer__actions">
+                                        <Button
+                                            danger
+                                            size="small"
+                                            icon={<StopOutlined />}
+                                            disabled={!sending}
+                                            onClick={() => onStopStream()}
+                                        >
+                                            停止
+                                        </Button>
+                                        <Button
+                                            type="primary"
+                                            size="small"
+                                            icon={<SendOutlined />}
+                                            loading={sending}
+                                            onClick={() => void onSend()}
+                                        >
+                                            发送
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
                         </>
                     )}

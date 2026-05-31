@@ -1,12 +1,11 @@
-import {Button, Card, Form, Input, Typography, theme, message} from "antd";
+import {Button, Form, Input, message} from "antd";
 import {UserOutlined, LockOutlined} from "@ant-design/icons";
 import {useLocation, useNavigate} from "react-router-dom";
 import {useEffect, useState} from "react";
 import {login} from "@/service/authService.ts";
 import {getAccessToken, setAccessToken} from "@/service/token.ts";
 import {RequestError} from "@/service/request.ts";
-
-const {Title, Text} = Typography;
+import {DisplayHeading, GlassSurface} from "@/components/shell";
 
 /** 仅允许站内相对路径，避免 //evil 开放重定向 */
 function safeReturnPath(to: string): string {
@@ -14,16 +13,15 @@ function safeReturnPath(to: string): string {
     return to;
 }
 
-type LoginForm = { email: string; password: string };
+type LoginForm = {email: string; password: string};
 
 export default function LoginPage() {
     const [form] = Form.useForm<LoginForm>();
     const [submitting, setSubmitting] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
-    const {token} = theme.useToken();
 
-    const from = safeReturnPath((location.state as { from?: string } | null)?.from ?? "/");
+    const from = safeReturnPath((location.state as {from?: string} | null)?.from ?? "/");
 
     useEffect(() => {
         if (getAccessToken()) {
@@ -47,57 +45,56 @@ export default function LoginPage() {
     };
 
     return (
-        <div
-            style={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 24,
-                background: `linear-gradient(160deg, ${token.colorPrimaryBg} 0%, ${token.colorBgLayout} 45%, #fff 100%)`,
-            }}
-        >
-            <Card
-                style={{
-                    width: "min(400px, 100%)",
-                    boxShadow: token.boxShadowSecondary,
-                }}
-                styles={{body: {paddingBlock: 28, paddingInline: 28}}}
-            >
-                <Title level={3} style={{marginTop: 0, marginBottom: 8, textAlign: "center"}}>
-                    登录
-                </Title>
-                <Text type="secondary" style={{display: "block", textAlign: "center", marginBottom: 24}}>
-                    使用已注册的邮箱与密码登录
-                </Text>
+        <div className="app-backdrop login-page">
+            <div className="login-page__card">
+                <GlassSurface variant="strong" padding="lg">
+                    <div className="login-page__card-inner">
+                        <DisplayHeading level={2} align="center" subtitle="使用已注册的邮箱与密码登录">
+                            欢迎回来
+                        </DisplayHeading>
 
-                <Form<LoginForm> form={form} layout="vertical" onFinish={onFinish} requiredMark="optional">
-                    <Form.Item
-                        label="邮箱"
-                        name="email"
-                        rules={[
-                            {required: true, message: "请输入邮箱"},
-                        ]}
-                    >
-                        <Input prefix={<UserOutlined style={{opacity: 0.45}} />} placeholder="you@example.com" autoComplete="email" size="large" />
-                    </Form.Item>
+                        <Form<LoginForm>
+                            form={form}
+                            layout="vertical"
+                            onFinish={onFinish}
+                            requiredMark="optional"
+                            style={{marginTop: 28}}
+                        >
+                            <Form.Item
+                                label="邮箱"
+                                name="email"
+                                rules={[{required: true, message: "请输入邮箱"}]}
+                            >
+                                <Input
+                                    prefix={<UserOutlined style={{opacity: 0.45}} />}
+                                    placeholder="you@example.com"
+                                    autoComplete="email"
+                                    size="large"
+                                />
+                            </Form.Item>
 
-                    <Form.Item label="密码" name="password" rules={[{required: true, message: "请输入密码"}]}>
-                        <Input.Password
-                            prefix={<LockOutlined style={{opacity: 0.45}} />}
-                            placeholder="密码"
-                            autoComplete="current-password"
-                            size="large"
-                        />
-                    </Form.Item>
+                            <Form.Item
+                                label="密码"
+                                name="password"
+                                rules={[{required: true, message: "请输入密码"}]}
+                            >
+                                <Input.Password
+                                    prefix={<LockOutlined style={{opacity: 0.45}} />}
+                                    placeholder="密码"
+                                    autoComplete="current-password"
+                                    size="large"
+                                />
+                            </Form.Item>
 
-                    <Form.Item style={{marginBottom: 0}}>
-                        <Button type="primary" htmlType="submit" block size="large" loading={submitting}>
-                            登录
-                        </Button>
-                    </Form.Item>
-                </Form>
-            </Card>
+                            <Form.Item style={{marginBottom: 0}}>
+                                <Button type="primary" htmlType="submit" block size="large" loading={submitting}>
+                                    登录
+                                </Button>
+                            </Form.Item>
+                        </Form>
+                    </div>
+                </GlassSurface>
+            </div>
         </div>
     );
 }

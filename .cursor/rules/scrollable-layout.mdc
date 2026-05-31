@@ -1,0 +1,23 @@
+---
+description: >-
+  Page-internal scroll regions in the web app must follow scrollable-layout
+  skill (chat panels, sidebars, virtual lists, fixed viewports).
+globs: apps/web/**/*.{tsx,css}
+alwaysApply: false
+---
+
+# Scrollable Layout (Web)
+
+When implementing **in-page scroll** (not full-document scroll)—including chat message areas, sidebars, master-detail lists, tables or virtual lists in a fixed shell—**before writing layout CSS/structure**:
+
+1. Read `~/.cursor/skills/scrollable-layout/SKILL.md`
+2. Apply the patterns there:
+   - **Grid** for header / scroll body / footer: `grid-template-rows: auto minmax(0, 1fr) auto`
+   - **ScrollHost + ScrollArea** (`position: relative` + `absolute; inset: 0; overflow-y: auto`) when nested in antd Layout, Spin, or glass shells
+   - **One** `overflow-y: auto` owner per axis
+3. **Do not** wrap scroll content in `<Spin>`—use an overlay loader instead
+4. **Avoid** `height: 100%` on flex children as the primary scroll fix
+
+Reference: `apps/web/src/pages/chat/chat.css`
+
+After implementation, verify in DevTools: scroll element has `clientHeight > 0` and, when content overflows, `clientHeight < scrollHeight`.

@@ -1,12 +1,12 @@
 import {memo} from "react";
-import {Flex, Tag, Typography, theme} from "antd";
+import {Tag, Typography} from "antd";
 import {RobotOutlined, UserOutlined} from "@ant-design/icons";
 import type {ChatMessage, ChatSource} from "@/service/chatApi.ts";
 import MarkdownContent from "@/components/MarkdownContent";
 
 const {Text} = Typography;
 
-export function parseSources(raw: unknown): ChatSource[] {
+function parseSources(raw: unknown): ChatSource[] {
     if (raw == null) return [];
     if (Array.isArray(raw)) return raw as ChatSource[];
     if (typeof raw === "string") {
@@ -32,56 +32,39 @@ const ChatMessageBubble = memo(function ChatMessageBubble({
     isStreaming = false,
     streamDisplay,
 }: ChatMessageBubbleProps) {
-    const {token} = theme.useToken();
     const isUser = message.role === "user";
     const sources = message.role === "assistant" ? parseSources(message.sources_json) : [];
     const assistantContent = isStreaming ? (streamDisplay ?? "") : message.content;
     const showStreamCursor = isStreaming && !assistantContent.trim();
+
     return (
-        <Flex justify={isUser ? "flex-end" : "flex-start"}>
-            <Flex gap={8} style={{maxWidth: "min(720px, 85%)"}} align="flex-start">
-                {!isUser && (
-                    <RobotOutlined
-                        style={{
-                            fontSize: 18,
-                            marginTop: 4,
-                            color: token.colorPrimary,
-                        }}
-                    />
+        <div className={`chat-bubble-wrap ${isUser ? "chat-bubble-wrap--user" : "chat-bubble-wrap--assistant"}`}>
+            <div className={`chat-bubble-row ${isUser ? "chat-bubble-row--user" : "chat-bubble-row--assistant"}`}>
+            {!isUser && <RobotOutlined className="chat-bubble-icon chat-bubble-icon--assistant" />}
+            <div className={`chat-bubble ${isUser ? "chat-bubble--user" : "chat-bubble--assistant"}`}>
+                {isUser ? (
+                    <Text style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{message.content}</Text>
+                ) : showStreamCursor ? (
+                    <Text type="secondary" aria-busy="true">
+                        {"\u258c"}
+                    </Text>
+                ) : (
+                    <MarkdownContent content={assistantContent} />
                 )}
-                <div
-                    style={{
-                        background: isUser ? token.colorPrimaryBg : token.colorFillSecondary,
-                        border: `1px solid ${token.colorBorderSecondary}`,
-                        borderRadius: token.borderRadiusLG,
-                        padding: "10px 14px",
-                    }}
-                >
-                    {isUser ? (
-                        <Text style={{whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{message.content}</Text>
-                    ) : showStreamCursor ? (
-                        <Text type="secondary" aria-busy="true">
-                            {"\u258c"}
-                        </Text>
-                    ) : (
-                        <MarkdownContent content={assistantContent} />
-                    )}
-                    {sources.length > 0 && (
-                        <div style={{marginTop: 8}}>
-                            <Text type="secondary" style={{fontSize: 12}}>
-                                引用：
-                            </Text>{" "}
-                            {sources.map((s) => (
-                                <Tag key={s.id} style={{marginTop: 4}}>
-                                    {s.title}
-                                </Tag>
-                            ))}
-                        </div>
-                    )}
-                </div>
-                {isUser && <UserOutlined style={{fontSize: 18, marginTop: 4, color: token.colorTextSecondary}} />}
-            </Flex>
-        </Flex>
+                {sources.length > 0 && (
+                    <div className="chat-bubble__sources">
+                        <span className="chat-bubble__sources-label">引用：</span>
+                        {sources.map((s) => (
+                            <Tag key={s.id} style={{marginTop: 4}}>
+                                {s.title}
+                            </Tag>
+                        ))}
+                    </div>
+                )}
+            </div>
+            {isUser && <UserOutlined className="chat-bubble-icon chat-bubble-icon--user" />}
+            </div>
+        </div>
     );
 });
 

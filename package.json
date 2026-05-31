@@ -7,10 +7,17 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
+    "prepare": "husky",
     "dev": "concurrently -n web,backend -c blue,green \"pnpm -C apps/web dev\" \"pnpm -C apps/backend dev\""
+  },
+  "lint-staged": {
+    "apps/web/**/*.{ts,tsx}": "pnpm -C apps/web exec eslint --fix --max-warnings=0",
+    "packages/components/**/*.{ts,tsx}": "pnpm -C apps/web exec eslint --fix --max-warnings=0"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
     "tsdown": "^0.22.0",
     "typescript": "^6.0.3"
   },

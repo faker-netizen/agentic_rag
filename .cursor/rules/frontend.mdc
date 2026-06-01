@@ -1,0 +1,33 @@
+---
+description: apps/web 与 packages/components 的前端 TypeScript/React 约束
+globs: apps/web/**/*.{ts,tsx}, packages/components/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# 前端规范
+
+## 类型与组件文件
+
+- 组件：仅 TypeScript；props 有类型；禁止 `@ts-ignore`
+- 避免 `any`；优先窄类型或 `unknown` + 类型守卫
+- 一文件一 default export 组件；helper/hook 放单独文件（ESLint `react-refresh/only-export-components`）
+
+## 函数与组件粒度
+
+- 单个函数 / 自定义 hook **≤ 40 行**（不含空行与注释）；超出必须拆分
+- **禁止** 在 JSX 内写大段逻辑（复杂 `onClick`、嵌套三元、内联 async）
+- 页面组件 = **编排 + 布局**；数据请求、流式、表单状态抽到 `useXxx` hook
+- 相同 UI 块 / 处理逻辑出现 **≥ 2 次** → 抽子组件或 hook，禁止 copy-paste
+- 事件处理：超过 ~10 行业务逻辑 → 具名函数或 hook 方法
+
+## UI 与主题
+
+- 页内滚动：`.cursor/rules/scrollable-layout.mdc` + `~/.cursor/skills/scrollable-layout/SKILL.md`
+- macOS / 玻璃 UI：优先 `shell/`、`desktop/` 模式
+- 主题：`theme/tokens.css`、`antdTheme.ts`
+
+## 拆分与完成前
+
+- 改页面/复杂组件前，阅读 `frontend-component` skill
+- 结构质量：`.ai/gates/frontend-quality.md`
+- 布局与状态：`.ai/gates/ui-quality.md`

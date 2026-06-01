@@ -1,0 +1,57 @@
+---
+alwaysApply: true
+---
+# AI Harness 地图
+
+本仓库采用 **harness 工程**：Rules 约束、Skills 编排、Gates 验证、Git/CI 强制执行。
+
+## 目录职责
+
+| 路径 | 用途 |
+|------|------|
+| `.cursor/rules/` | 自动注入的约束（短、硬） |
+| `.cursor/skills/` | 任务入口（何时做 + 步骤摘要） |
+| `.ai/workflows/` | 详细分步流程 |
+| `.ai/gates/` | 完成前的检查清单 |
+| `.ai/templates/` | 产出物格式模板 |
+| `.ai/memory/` | 项目决策与失败日志 |
+| `.ai/progress/` | **进度存档**（新会话入口 `CURRENT.md`，功能完成写 `log/`） |
+| `.ai/planning/FEATURE-PLAN.md` | **功能规划**（模块、阶段、backlog；新功能前先对齐） |
+| `.cursor/mcp.json` | **MCP 服务器**（Context7、Playwright） |
+| `.cursor/MCP.md` | MCP 用途、Agent 约定、故障排查 |
+
+## 任务路由
+
+| 用户意图 | 阅读 workflow | Skills | Gates |
+|----------|---------------|--------|-------|
+| **新会话 / 续作 / 进度** | — | `project-progress` | — |
+| **功能规划 / roadmap / 做什么** | `.ai/planning/FEATURE-PLAN.md` | — | — |
+| Git 提交 / 暂存变更 | — | `.cursor/skills/commit-workflow/` | `.ai/gates/code-quality.md` |
+| 新功能 / 需求 | `.ai/workflows/feature-development.md` | `feature-development` | `pre-implementation`、`code-quality` |
+| UI 页面 / 布局 / 桌面壳 | `.ai/workflows/ui-page-development.md` | `ui-page-development`、`frontend-component` | `frontend-quality`、`ui-quality`、`code-quality` |
+| 前端组件 / 页面逻辑拆分 | — | `frontend-component` | `frontend-quality` |
+| Bug 修复 | `.ai/workflows/bugfix.md` | — | `code-quality` |
+| 后端 Service / API | — | `backend-service` | `backend-quality`、`api-contract` |
+| Harness / 工作流设计 | — | `harness-engineering` | — |
+| 第三方库 API / 版本 / 文档 | — | **Context7 MCP** | — |
+| UI 验证 / 浏览器复现 / SSE 展示 | — | **Playwright MCP** | `ui-quality` |
+
+## Agent 协议
+
+0. **续作** — 新会话或用户说「继续项目」：先读 `.ai/progress/CURRENT.md`；做新功能前读 `.ai/planning/FEATURE-PLAN.md` 对齐范围。
+1. **开始** — 匹配路由表；非 trivial 任务则阅读 workflow 及关联 skill。
+2. **实现** — 遵循所 touch 文件对应的 `.cursor/rules/*.mdc`；外部库 API 不确定时用 **Context7 MCP**（详见 `.cursor/MCP.md`）。
+3. **验证** — 跑 gates（lint、build）；前端/UI 改动可用 **Playwright MCP** 在本地 dev 上复验；宣称完成前阅读 `.ai/gates/`。
+4. **纠错** — hook/CI 失败时读 `.ai/memory/common-failures.md`；修复后重新验证。
+5. **记忆** — 遇到新的失败模式，在 `common-failures.md` 追加一行。
+6. **存档** — 功能完成并 commit 后：写 `.ai/progress/log/YYYY-MM-DD-*.md`，更新 `CURRENT.md`（见 `project-progress` skill）。
+
+## 硬门禁（不可跳过）
+
+- **pre-commit**：Husky → lint-staged → 对已暂存 `apps/web` / `packages/components` 的 TS/TSX 跑 ESLint
+- **User rules**：禁止 `ts-ignore`、禁止随意 `any`、组件必须 TypeScript、请求需处理 loading/error/empty
+
+## 个人 skill vs 项目 skill
+
+- **项目**（`.cursor/skills/`）：本仓库团队共享的工作流
+- **个人**（`~/.cursor/skills/`）：如 `scrollable-layout`、`macbook-ui` — UI/布局 rule 指向时使用

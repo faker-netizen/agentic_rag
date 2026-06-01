@@ -1,34 +1,25 @@
 {
-  "name": "design_to_code",
+  "name": "repo_d2c",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "dev:frontend": "pnpm -C apps/web dev",
+    "dev:backend": "pnpm -C apps/backend dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "prepare": "husky",
+    "dev": "concurrently -n web,backend -c blue,green \"pnpm -C apps/web dev\" \"pnpm -C apps/backend dev\""
   },
-  "dependencies": {
-    "@reduxjs/toolkit": "^2.11.2",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-redux": "^9.2.0"
+  "lint-staged": {
+    "apps/web/**/*.{ts,tsx}": "pnpm -C apps/web exec eslint --fix --max-warnings=0",
+    "packages/components/**/*.{ts,tsx}": "pnpm -C apps/web exec eslint --fix --max-warnings=0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.48.0",
-    "vite": "^7.3.1"
+    "concurrently": "^9.2.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
+    "tsdown": "^0.22.0",
+    "typescript": "^6.0.3"
   },
   "packageManager": "pnpm@10.28.1"
-
 }

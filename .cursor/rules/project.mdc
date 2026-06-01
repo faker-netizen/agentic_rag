@@ -1,0 +1,31 @@
+---
+description: design_to_code monorepo 结构与包边界约定
+alwaysApply: true
+---
+
+# 项目约定
+
+## 目录布局
+
+| 路径 | 职责 |
+|------|------|
+| `apps/web` | React + Vite 前端（桌面壳、聊天、页面） |
+| `apps/backend` | Express RAG / 鉴权 API |
+| `packages/components` | 共享 React 组件 |
+| `packages/utils` | 共享工具 |
+
+## 常用命令（仓库根目录）
+
+```bash
+pnpm dev          # web + backend
+pnpm -C apps/web dev
+pnpm lint         # 递归 lint（有 script 的包）
+pnpm build        # 递归构建
+```
+
+## 代码原则
+
+- 控制 diff 范围；复用现有组件与模式
+- 业务逻辑放在 JSX 外；抽取 hooks/services
+- 请求需处理 loading、error、empty 状态
+- 不重复造轮子；加抽象前先读周边代码

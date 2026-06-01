@@ -1,0 +1,15 @@
+---
+description: 后端鉴权、密钥与用户输入相关的安全约束
+globs: apps/backend/**/*.{ts,tsx}, apps/web/src/service/**/*
+alwaysApply: false
+---
+
+# 安全规范
+
+- 禁止提交密钥、`.env`、token、凭证
+- 鉴权 token：沿用 `apps/web/src/service/token.ts` 现有模式
+- 校验并净化外部输入（后端适用处使用 Zod）
+- 禁止记录密码、JWT secret 或完整 auth header
+- CORS、cookie 配置：仅在用户明确要求时修改
+
+变更 API 前，若新增或修改接口，阅读 `.ai/gates/api-contract.md`。

@@ -1,5 +1,6 @@
 import express from "express";
 import chatService from "../services/chatService.js";
+import {bindRequestAbort, createSseWriter, setupSseResponse} from "../utils/sse.js";
 
 const router = express.Router();
 
@@ -144,38 +145,17 @@ router.post("/sessions/:sessionId/messages", async (req, res) => {
         const session = await chatService.getSession(userId, sessionId);
         if (!session) return res.status(404).json({error: "会话不存在"});
 
-        res.status(200);
-        res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-        res.setHeader("Cache-Control", "no-cache, no-transform");
-        res.setHeader("Connection", "keep-alive");
-        res.setHeader("X-Accel-Buffering", "no");
-        if (typeof res.flushHeaders === "function") {
-            res.flushHeaders();
-        }
-
-        const abort = new AbortController();
-        const onClose = () => {
-            abort.abort();
-        };
-        req.on("close", onClose);
-
-        const sse = (event: string, data: Record<string, unknown>) => {
-            if (res.writableEnded) return;
-            try {
-                res.write(`event: ${event}\n`);
-                res.write(`data: ${JSON.stringify(data)}\n\n`);
-            } catch {
-                /* 客户端已断开 */
-            }
-        };
+        setupSseResponse(res);
+        const {signal, cleanup} = bindRequestAbort(req);
+        const sse = createSseWriter(res);
 
         try {
-            await chatService.appendMessageStream(userId, session, content, sse, abort.signal);
+            await chatService.appendMessage(userId, session, content, sse, signal);
         } catch (e) {
             const message = e instanceof Error ? e.message : "发送失败";
             sse("error", {message});
         } finally {
-            req.removeListener("close", onClose);
+            cleanup();
         }
         res.end();
     } catch (e) {

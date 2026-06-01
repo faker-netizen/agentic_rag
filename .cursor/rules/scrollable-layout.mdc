@@ -1,23 +1,23 @@
 ---
 description: >-
-  Page-internal scroll regions in the web app must follow scrollable-layout
-  skill (chat panels, sidebars, virtual lists, fixed viewports).
+  Web 应用页内滚动区域须遵循 scrollable-layout skill（聊天面板、侧边栏、
+  虚拟列表、固定视口）。
 globs: apps/web/**/*.{tsx,css}
 alwaysApply: false
 ---
 
-# Scrollable Layout (Web)
+# 可滚动布局（Web）
 
-When implementing **in-page scroll** (not full-document scroll)—including chat message areas, sidebars, master-detail lists, tables or virtual lists in a fixed shell—**before writing layout CSS/structure**:
+实现**页内滚动**（非整页 document 滚动）时——包括聊天消息区、侧边栏、主从列表、固定壳内的表格或虚拟列表——**在写布局 CSS/结构之前**：
 
-1. Read `~/.cursor/skills/scrollable-layout/SKILL.md`
-2. Apply the patterns there:
-   - **Grid** for header / scroll body / footer: `grid-template-rows: auto minmax(0, 1fr) auto`
-   - **ScrollHost + ScrollArea** (`position: relative` + `absolute; inset: 0; overflow-y: auto`) when nested in antd Layout, Spin, or glass shells
-   - **One** `overflow-y: auto` owner per axis
-3. **Do not** wrap scroll content in `<Spin>`—use an overlay loader instead
-4. **Avoid** `height: 100%` on flex children as the primary scroll fix
+1. 阅读 `~/.cursor/skills/scrollable-layout/SKILL.md`
+2. 应用其中模式：
+   - **Grid** 划分 header / 滚动 body / footer：`grid-template-rows: auto minmax(0, 1fr) auto`
+   - 嵌在 antd Layout、Spin 或 glass shell 内时使用 **ScrollHost + ScrollArea**（`position: relative` + `absolute; inset: 0; overflow-y: auto`）
+   - 每个滚动轴仅 **一个** `overflow-y: auto` 负责元素
+3. **不要**用 `<Spin>` 包裹滚动内容——改用 overlay loader
+4. **避免**用 flex 子项 `height: 100%` 作为滚动修复的主要手段
 
-Reference: `apps/web/src/pages/chat/chat.css`
+参考：`apps/web/src/pages/chat/chat.css`
 
-After implementation, verify in DevTools: scroll element has `clientHeight > 0` and, when content overflows, `clientHeight < scrollHeight`.
+实现后在 DevTools 验证：滚动元素 `clientHeight > 0`；内容溢出时 `clientHeight < scrollHeight`。

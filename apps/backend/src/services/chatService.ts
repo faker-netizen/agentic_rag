@@ -106,100 +106,12 @@ class ChatService {
         return rows as ChatMessageRow[];
     }
 
-    async appendMessage(
-        userId: number,
-        sessionId: number,
-        content: string
-    ): Promise<{
-        userMessageId: number;
-        assistantMessageId: number;
-        answer: string;
-        sources: ChatSource[] | null;
-    }> {
-        const text = content.trim();
-        if (!text) throw new Error("消息内容不能为空");
-
-        const session = await this.getSession(userId, sessionId);
-        if (!session) throw new Error("会话不存在");
-
-        const [histRows] = await pool.query(
-            `SELECT role, content FROM chat_messages
-             WHERE session_id = ?
-             ORDER BY id DESC
-             LIMIT ?`,
-            [sessionId, MAX_HISTORY]
-        );
-        const histDesc = histRows as Array<{role: string; content: string}>;
-        const historyAsc = [...histDesc]
-            .reverse()
-            .filter((h) => h.role === "user" || h.role === "assistant")
-            .map((h) => ({role: h.role as "user" | "assistant", content: h.content}));
-
-        const [um] = await pool.query<ResultSetHeader>(
-            "INSERT INTO chat_messages (session_id, role, content) VALUES (?, 'user', ?)",
-            [sessionId, text]
-        );
-        const userMessageId = um.insertId;
-
-        let answer: string;
-        let sources: ChatSource[] | null = null;
-
-        try {
-            if (session.knowledge_base_id != null) {
-                const kbId = session.knowledge_base_id;
-                const {answer: a, chunks} = await ragService.answerWithRAG(text, {
-                    userId,
-                    knowledgeBaseId: kbId,
-                    k: 5,
-                    history: historyAsc,
-                });
-                answer = a;
-                const sourceIds = [...new Set(chunks.map((c) => c.metadata.documentId))];
-                const src: ChatSource[] = [];
-                for (const docId of sourceIds) {
-                    const doc = await documentService.getDocumentScoped(docId, userId, kbId);
-                    if (doc?.id != null) src.push({id: doc.id, title: doc.title});
-                }
-                sources = src.length ? src : null;
-            } else {
-                answer = await ragService.chatPlain(text, historyAsc);
-            }
-        } catch (e) {
-            answer = `生成失败：${e instanceof Error ? e.message : String(e)}`;
-            sources = null;
-        }
-
-        const [am] = await pool.query<ResultSetHeader>(
-            "INSERT INTO chat_messages (session_id, role, content, sources_json) VALUES (?, 'assistant', ?, ?)",
-            [sessionId, answer, sources ? JSON.stringify(sources) : null]
-        );
-
-        const newTitle =
-            session.title === DEFAULT_TITLE || !session.title.trim()
-                ? text.slice(0, 80)
-                : session.title;
-
-        await pool.query(
-            `UPDATE chat_sessions
-             SET title = ?, updated_at = CURRENT_TIMESTAMP
-             WHERE id = ? AND user_id = ?`,
-            [newTitle.slice(0, 255), sessionId, userId]
-        );
-
-        return {
-            userMessageId,
-            assistantMessageId: am.insertId,
-            answer,
-            sources,
-        };
-    }
-
     /**
-     * 流式发送：先落库用户消息，再通过 SSE 推送 token；结束时落库助手消息。
+     * SSE 发送：先落库用户消息，推送 token；结束时落库助手消息。
      * 事件：meta → sources（可选）→ token（多次）→ done；失败时 error（仍落库失败文案）。
      * 调用方须先校验会话存在，并传入 `session`（避免已写 SSE 头后再 404）。
      */
-    async appendMessageStream(
+    async appendMessage(
         userId: number,
         session: ChatSessionRow,
         content: string,

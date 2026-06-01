@@ -19,9 +19,10 @@
    - 支持按documentId过滤
    - 返回相关度分数和元数据
 
-3. **answerWithRAG**: 使用RAG回答问题
-   - 使用LangChain的retrieval chain
-   - 结合检索到的文档内容生成回答
+3. **answerWithRAGStream** / **streamChatPlain**: 流式 RAG / 纯对话（**唯一** LLM 输出路径，SSE）
+   - 先下发 context 片段（引用），再逐 token 输出
+   - Chat：`POST /api/chat/sessions/:id/messages`
+   - RAG 页：`POST /api/rag/query`
 
 4. **deleteDocument**: 删除文档
    - 从向量存储中标记删除

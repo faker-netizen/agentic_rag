@@ -1,8 +1,8 @@
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {Button, Card, Form, Input, Select, Space, Table, Typography, message} from "antd";
 import type {ColumnsType} from "antd/es/table";
 import {listKnowledgeBases, type KnowledgeBase} from "@/service/knowledgeBaseApi.ts";
-import {queryRag, type RagSource} from "@/service/ragApi.ts";
+import {streamRagQuery, type RagSource} from "@/service/ragApi.ts";
 import {RequestError} from "@/service/request.ts";
 import MarkdownContent from "@/components/MarkdownContent";
 
@@ -18,6 +18,7 @@ const sourceColumns: ColumnsType<RagSource> = [
 ];
 
 export default function RagPage() {
+    const abortRef = useRef<AbortController | null>(null);
     const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
     const [loadingKbs, setLoadingKbs] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -45,6 +46,10 @@ export default function RagPage() {
         void loadKbs();
     }, [loadKbs]);
 
+    useEffect(() => {
+        return () => abortRef.current?.abort();
+    }, []);
+
     const onSubmit = async () => {
         try {
             await form.validateFields();
@@ -52,17 +57,39 @@ export default function RagPage() {
             return;
         }
         const {knowledgeBaseId, query} = form.getFieldsValue();
+        abortRef.current?.abort();
+        const ac = new AbortController();
+        abortRef.current = ac;
+
         setSubmitting(true);
         setAnswer("");
         setSources([]);
+        let streamText = "";
+
         try {
-            const res = await queryRag({query, knowledgeBaseId});
-            setAnswer(res.answer);
-            setSources(res.sources);
+            await streamRagQuery(
+                {query, knowledgeBaseId},
+                {
+                    onSources: ({sources: s}) => setSources(s),
+                    onToken: ({text}) => {
+                        streamText += text;
+                        setAnswer(streamText);
+                    },
+                    onError: ({message: m}) => message.error(m),
+                    onDone: ({answer: a, sources: s}) => {
+                        setAnswer(a);
+                        setSources(s);
+                    },
+                },
+                {signal: ac.signal}
+            );
         } catch (e) {
-            message.error(errMsg(e));
+            if (!(e instanceof DOMException && e.name === "AbortError")) {
+                message.error(errMsg(e));
+            }
         } finally {
             setSubmitting(false);
+            if (abortRef.current === ac) abortRef.current = null;
         }
     };
 
@@ -100,9 +127,12 @@ export default function RagPage() {
                     </Form.Item>
                 </Form>
             </Card>
-            {(answer || sources.length > 0) && (
+            {(answer || sources.length > 0 || submitting) && (
                 <Card title="结果">
-                    <MarkdownContent content={answer} />
+                    <MarkdownContent content={answer || (submitting ? "" : "")} />
+                    {submitting && !answer && (
+                        <Typography.Text type="secondary">生成中…</Typography.Text>
+                    )}
                     {sources.length > 0 && (
                         <>
                             <Title level={5}>引用片段</Title>

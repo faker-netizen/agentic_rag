@@ -21,11 +21,6 @@ type EmbeddingRow = {
     embedding: number[];
 };
 
-type AnswerWithRagResult = {
-    answer: string;
-    chunks: RagChunkItem[];
-};
-
 /** 流式：先下发检索到的片段（用于引用），再逐 token 输出模型文本 */
 export type RagStreamPart =
     | {type: "context"; chunks: RagChunkItem[]}
@@ -209,80 +204,6 @@ class RAGService {
         }
     }
 
-    async answerWithRAG(
-        query: string,
-        opts?: {
-            documentId?: number;
-            knowledgeBaseId?: number;
-            userId?: number;
-            k?: number;
-            minScore?: number;
-            /** 本轮之前的 user/assistant 轮次 */
-            history?: RagChatHistory;
-        }
-    ): Promise<AnswerWithRagResult> {
-        try {
-            if (opts?.userId == null) {
-                return {answer: "信息不足", chunks: []};
-            }
-
-            const history = opts.history ?? [];
-            const state = await invokeRagRetrievalGraph({
-                userQuery: query,
-                conversationHistory: history,
-                ragOpts: {
-                    userId: opts.userId,
-                    knowledgeBaseId: opts.knowledgeBaseId,
-                    documentId: opts.documentId,
-                    k: opts.k ?? 5,
-                    minScore: opts.minScore,
-                },
-            });
-
-            const chunks = state.chunks as RagChunkItem[];
-            if (this.shouldUsePlainChatFallback({chunks, evalResult: state.evalResult})) {
-                const answer = await this.chatPlain(query, history, {ragFallback: true});
-                return {answer, chunks: []};
-            }
-
-            const llm = createLLM();
-            const context = chunks
-                .map((c, i) => `片段${i + 1}(score=${c.score.toFixed(3)}):\n${c.content}`)
-                .join("\n\n");
-
-            const messages = buildRagGenerationMessages(query, context, history);
-            const resp = await llm.invoke(messages);
-            const answer =
-                typeof resp.content === "string" ? resp.content : JSON.stringify(resp.content);
-
-            return {answer, chunks};
-        } catch (error) {
-            console.error("[RAG] answerWithRAG failed:", error);
-            throw error;
-        }
-    }
-
-    /** 无知识库时的多轮纯对话；ragFallback 表示知识库检索未命中后的兜底 */
-    async chatPlain(
-        userMessage: string,
-        history: Array<{role: "user" | "assistant"; content: string}>,
-        options?: {ragFallback?: boolean}
-    ): Promise<string> {
-        const llm = createLLM();
-        const systemText = options?.ragFallback
-            ? "你是友好、简洁的中文助手。当前知识库未检索到足够相关的文档片段，请结合【对话历史】与用户问题作答；" +
-              "不要编造文档或引用来源，可说明未在知识库中找到直接依据，再基于常识与上下文尽量有帮助地回复。"
-            : "你是友好、简洁的中文助手。回答要有帮助、可读。";
-        const msgs: (SystemMessage | HumanMessage | AIMessage)[] = [new SystemMessage(systemText)];
-        for (const h of history) {
-            if (h.role === "user") msgs.push(new HumanMessage(h.content));
-            else msgs.push(new AIMessage(truncateChatContent(h.content, 2000)));
-        }
-        msgs.push(new HumanMessage(userMessage));
-        const resp = await llm.invoke(msgs);
-        return typeof resp.content === "string" ? resp.content : JSON.stringify(resp.content);
-    }
-
     private shouldUsePlainChatFallback(state: {
         chunks: RagChunkItem[];
         evalResult?: {sufficient: boolean} | null;
@@ -291,7 +212,7 @@ class RAGService {
     }
 
     /**
-     * 与 answerWithRAG 同逻辑，使用 ChatOpenAI.stream（底层为 OpenAI 兼容流式 Chat Completions，适用于千问 compatible-mode）。
+     * RAG 问答（仅 SSE 流式）。先 context 片段，再 token。
      */
     async *answerWithRAGStream(
         query: string,
@@ -354,7 +275,7 @@ class RAGService {
         }
     }
 
-    /** 与 chatPlain 同逻辑，流式输出 */
+    /** 无知识库或多轮纯对话（流式）；ragFallback 表示检索未命中后的兜底 */
     async *streamChatPlain(
         userMessage: string,
         history: Array<{role: "user" | "assistant"; content: string}>,

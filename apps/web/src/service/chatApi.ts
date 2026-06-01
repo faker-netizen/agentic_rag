@@ -1,6 +1,7 @@
 import http from "@/service/request.ts";
 import {apiBase, refreshAccessToken} from "@/service/authRefresh.ts";
 import {getAccessToken} from "@/service/token.ts";
+import {fetchSsePost} from "@/service/sseClient.ts";
 
 export type ChatSession = {
     id: number;
@@ -63,48 +64,16 @@ export type SendMessageResult = {
     sources: ChatSource[] | null;
 };
 
-async function readSse(
-    body: ReadableStream<Uint8Array>,
-    onEvent: (event: string, dataJson: string) => void
-): Promise<void> {
-    const reader = body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    for (;;) {
-        const {done, value} = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, {stream: true});
-        let sep: number;
-        while ((sep = buffer.indexOf("\n\n")) >= 0) {
-            const raw = buffer.slice(0, sep);
-            buffer = buffer.slice(sep + 2);
-            let eventName = "message";
-            const dataLines: string[] = [];
-            for (const line of raw.split("\n")) {
-                if (line.startsWith("event:")) eventName = line.slice(6).trim();
-                else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^\s/, ""));
-            }
-            const payload = dataLines.join("\n");
-            if (payload) onEvent(eventName, payload);
-        }
-    }
-}
-
 export type StreamChatHandlers = {
     onMeta: (p: {userMessageId: number}) => void;
     onSources: (p: {sources: ChatSource[] | null}) => void;
     onToken: (p: {text: string}) => void;
-    /** 模型或落库失败时服务端推送；随后仍会 `onDone`（answer 为失败说明） */
     onError: (p: {message: string}) => void;
-    /** 用户中断生成时服务端可能推送 */
     onAborted?: (p: {stopped?: boolean}) => void;
     onDone: (p: SendMessageResult) => void;
 };
 
-/**
- * 发送聊天消息（SSE）。需用 fetch 消费流；401 时会尝试 refresh 后重试一次。
- * 后端为 OpenAI 兼容流式（千问 compatible-mode）经 LangChain `stream` 转发。
- */
+/** POST /api/chat/sessions/:id/messages — SSE */
 export async function streamChatMessage(
     sessionId: number,
     content: string,
@@ -112,51 +81,11 @@ export async function streamChatMessage(
     options?: {signal?: AbortSignal}
 ): Promise<void> {
     const url = `${apiBase()}/api/chat/sessions/${sessionId}/messages`;
-    const signal = options?.signal;
 
-    const run = async (retried: boolean): Promise<void> => {
-        const token = getAccessToken();
-        const headers: Record<string, string> = {
-            Accept: "text/event-stream",
-            "Content-Type": "application/json",
-        };
-        if (token) headers.Authorization = `Bearer ${token}`;
-
-        const res = await fetch(url, {
-            method: "POST",
-            credentials: "include",
-            headers,
-            body: JSON.stringify({content}),
-            signal,
-        });
-
-        if (res.status === 401 && !retried) {
-            const ok = await refreshAccessToken();
-            if (ok) return run(true);
-            throw new Error("登录已过期，请重新登录");
-        }
-
-        if (!res.ok || !res.body) {
-            const t = await res.text().catch(() => "");
-            let errMsg = `请求失败(${res.status})`;
-            if (t) {
-                try {
-                    const j = JSON.parse(t) as {error?: string; message?: string};
-                    errMsg = j.error || j.message || errMsg;
-                } catch {
-                    errMsg = t;
-                }
-            }
-            throw new Error(errMsg);
-        }
-
-        await readSse(res.body, (event, dataStr) => {
-            let data: Record<string, unknown>;
-            try {
-                data = JSON.parse(dataStr) as Record<string, unknown>;
-            } catch {
-                return;
-            }
+    await fetchSsePost(
+        url,
+        {content},
+        (event, data) => {
             if (event === "meta") handlers.onMeta({userMessageId: Number(data.userMessageId)});
             else if (event === "sources")
                 handlers.onSources({sources: (data.sources as ChatSource[] | null) ?? null});
@@ -171,8 +100,11 @@ export async function streamChatMessage(
                     sources: (data.sources as ChatSource[] | null) ?? null,
                 });
             }
-        });
-    };
-
-    await run(false);
+        },
+        {
+            getToken: getAccessToken,
+            refreshToken: refreshAccessToken,
+            signal: options?.signal,
+        }
+    );
 }

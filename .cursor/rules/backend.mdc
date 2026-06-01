@@ -1,0 +1,29 @@
+---
+description: 后端 TypeScript Service 层结构与函数粒度约束
+globs: apps/backend/**/*.ts
+alwaysApply: false
+---
+
+# 后端规范
+
+## 函数粒度
+
+- 单个函数 **≤ 40 行**（不含空行与注释）；超出必须拆分
+- 单个函数 **单一职责**：校验、查询、编排、持久化、外部调用不要混在同一函数
+- **禁止** 在同一函数里同时写：SQL + 业务规则 + 第三方 API + 错误文案拼装
+
+## Service 层
+
+- 对外公开方法 = **编排**（读步骤、调步骤），不写大段实现细节
+- 相同逻辑出现 **≥ 2 次** → 抽 `private` 方法或同目录 helper，禁止 copy-paste
+- 流式 / 非流式变体应 **共享** history、sources、title 等核心逻辑
+
+## 拆分与实现
+
+- 改 `*Service.ts` 或新增 backend 逻辑前，阅读 `backend-service` skill
+- 完成前通过 `.ai/gates/backend-quality.md`
+
+## 其它
+
+- 输入校验与错误：明确 `throw` 或返回，避免静默吞错
+- 沿用 `security.mdc`；API 变更读 `.ai/gates/api-contract.md`

@@ -100,6 +100,14 @@ pnpm exec lint-staged   # 模拟 pre-commit（web TS/TSX）
 | [.ai/progress/CURRENT.md](./.ai/progress/CURRENT.md) | 当前进度与下一步 |
 | [.ai/progress/README.md](./.ai/progress/README.md) | 进度存档说明 |
 | [.cursor/rules/ai-harness.mdc](./.cursor/rules/ai-harness.mdc) | Agent 任务路由 |
+| [.cursor/MCP.md](./.cursor/MCP.md) | MCP（Context7 / Playwright）配置与 Agent 约定 |
+
+### Cursor MCP（可选）
+
+Agent 可通过 MCP 查库文档与做浏览器验证。配置见 [`.cursor/mcp.json`](./.cursor/mcp.json)，说明见 [`.cursor/MCP.md`](./.cursor/MCP.md)。
+
+- **Context7** — LangChain、Ant Design 等第三方文档
+- **Playwright** — 本地 UI / SSE 流式页面验证（首次需 `npx playwright install`）
 
 ## 路线图
 

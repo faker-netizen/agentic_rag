@@ -17,6 +17,8 @@ alwaysApply: true
 | `.ai/memory/` | 项目决策与失败日志 |
 | `.ai/progress/` | **进度存档**（新会话入口 `CURRENT.md`，功能完成写 `log/`） |
 | `.ai/planning/FEATURE-PLAN.md` | **功能规划**（模块、阶段、backlog；新功能前先对齐） |
+| `.cursor/mcp.json` | **MCP 服务器**（Context7、Playwright） |
+| `.cursor/MCP.md` | MCP 用途、Agent 约定、故障排查 |
 
 ## 任务路由
 
@@ -31,13 +33,15 @@ alwaysApply: true
 | Bug 修复 | `.ai/workflows/bugfix.md` | — | `code-quality` |
 | 后端 Service / API | — | `backend-service` | `backend-quality`、`api-contract` |
 | Harness / 工作流设计 | — | `harness-engineering` | — |
+| 第三方库 API / 版本 / 文档 | — | **Context7 MCP** | — |
+| UI 验证 / 浏览器复现 / SSE 展示 | — | **Playwright MCP** | `ui-quality` |
 
 ## Agent 协议
 
 0. **续作** — 新会话或用户说「继续项目」：先读 `.ai/progress/CURRENT.md`；做新功能前读 `.ai/planning/FEATURE-PLAN.md` 对齐范围。
 1. **开始** — 匹配路由表；非 trivial 任务则阅读 workflow 及关联 skill。
-2. **实现** — 遵循所 touch 文件对应的 `.cursor/rules/*.mdc`。
-3. **验证** — 跑 gates（lint、build）；宣称完成前阅读 `.ai/gates/`。
+2. **实现** — 遵循所 touch 文件对应的 `.cursor/rules/*.mdc`；外部库 API 不确定时用 **Context7 MCP**（详见 `.cursor/MCP.md`）。
+3. **验证** — 跑 gates（lint、build）；前端/UI 改动可用 **Playwright MCP** 在本地 dev 上复验；宣称完成前阅读 `.ai/gates/`。
 4. **纠错** — hook/CI 失败时读 `.ai/memory/common-failures.md`；修复后重新验证。
 5. **记忆** — 遇到新的失败模式，在 `common-failures.md` 追加一行。
 6. **存档** — 功能完成并 commit 后：写 `.ai/progress/log/YYYY-MM-DD-*.md`，更新 `CURRENT.md`（见 `project-progress` skill）。

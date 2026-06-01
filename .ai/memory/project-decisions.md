@@ -33,3 +33,10 @@
 - **决策：** 登录后使用 `DesktopShell`（dock/多窗口）；旧 `/chat` 重定向到 `/?open=chat`。
 - **原因：** macOS 风格多窗口体验。
 - **参考：** `apps/web/src/router/index.tsx`、`apps/web/src/desktop/`
+
+## 2026-05 — Cursor MCP（Context7 + Playwright）
+
+- **决策：** 项目启用 **Context7**（库文档）与 **Playwright MCP**（浏览器验证）；配置在 `.cursor/mcp.json`，说明在 `.cursor/MCP.md`。
+- **原因：** 减少 Agent 凭记忆写错第三方 API；UI/SSE 改动可在真实浏览器中复验，与 gates / lint 互补而非替代。
+- **约定：** MCP 查外部库；业务逻辑以仓库代码为准；Token/API Key 只放 Cursor 设置或环境变量。
+- **未采纳：** 仅用户级 `~/.cursor/mcp.json` 不写进仓库（不利于团队一致）；GitHub MCP 暂可选、未默认启用。

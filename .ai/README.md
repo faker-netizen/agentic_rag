@@ -7,6 +7,8 @@
 ```
 .cursor/rules/     → 自动注入的约束
 .cursor/skills/    → Cursor 可发现的任务入口
+.cursor/mcp.json   → MCP 服务器（Context7、Playwright）
+.cursor/MCP.md     → MCP 使用说明与 Agent 约定
 .ai/workflows/     → 详细流程（按需阅读）
 .ai/gates/         → 验证检查清单
 .ai/templates/     → 产出物模板
@@ -27,6 +29,7 @@
 - [后端代码质量门禁](./gates/backend-quality.md)
 - [前端代码质量门禁](./gates/frontend-quality.md)
 - [常见失败](./memory/common-failures.md)
+- [MCP 配置说明](../.cursor/MCP.md)
 
 ## 维护
 

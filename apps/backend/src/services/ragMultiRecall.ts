@@ -108,7 +108,7 @@ function escapeLikePattern(s: string): string {
 export function extractKeywordTerms(query: string): string[] {
     const raw = query.trim().toLowerCase();
     const terms = new Set<string>();
-    for (const w of raw.split(/[\s,.;:!?，。；：、""''（）()\[\]{}]+/u)) {
+    for (const w of raw.split(/[\s,.;:!?，。；：、""''（）()[\]{}]+/u)) {
         if (w.length >= 2 && /[a-z0-9]/i.test(w)) terms.add(w);
     }
     const cjk = raw.replace(/[^\u4e00-\u9fff]/gu, "");
@@ -252,33 +252,14 @@ function defaultWeights(): Record<RecallPathId, number> {
     return {vector: 0.55, keyword: 0.3, title: 0.15};
 }
 
-/**
- * 多路召回 + 融合。默认从库中最多拉取 2000 条候选再在内存中打分（与现有单路策略同量级）。
- */
-export async function multiRecallChunks(query: string, opts: MultiRecallOptions): Promise<MultiRecallResult> {
-    const recallPerPath = opts.recallPerPath ?? 24;
-    const finalK = opts.finalK ?? 8;
-    const minVectorScore = opts.minVectorScore ?? 0.15;
-    const paths: RecallPathId[] = opts.paths?.length ? opts.paths : ["vector", "keyword", "title"];
-    const fusion = opts.fusion ?? "rrf";
-    const candidateLimit = 2000;
-
-    if (!query.trim() || opts.userId == null) {
-        return {
-            chunks: [],
-            meta: {fusion, pathTopIds: {}, ...(opts.debug ? {byPath: {}} : {})},
-        };
-    }
-
-    const rows = await fetchCandidates(
-        opts.userId,
-        opts.knowledgeBaseId,
-        opts.documentId,
-        candidateLimit
-    );
-
+async function buildRecallByPath(
+    query: string,
+    rows: EmbeddingRow[],
+    paths: RecallPathId[],
+    recallPerPath: number,
+    minVectorScore: number
+): Promise<{chunksByPath: Record<RecallPathId, MultiRecallChunk[]>; pathTopIds: Record<string, number[]>}> {
     const terms = extractKeywordTerms(query);
-
     const chunksByPath = {} as Record<RecallPathId, MultiRecallChunk[]>;
     const pathTopIds: Record<string, number[]> = {};
 
@@ -293,25 +274,27 @@ export async function multiRecallChunks(query: string, opts: MultiRecallOptions)
     }
 
     if (paths.includes("keyword")) {
-        const list = rankByScoreDesc(
-            rows,
-            (row) => keywordScore(row.chunk_text, terms),
-            recallPerPath
-        );
+        const list = rankByScoreDesc(rows, (row) => keywordScore(row.chunk_text, terms), recallPerPath);
         chunksByPath.keyword = list;
         pathTopIds.keyword = list.map((c) => c.metadata.embeddingId);
     }
 
     if (paths.includes("title")) {
-        const list = rankByScoreDesc(
-            rows,
-            (row) => titleMatchScore(row.title, query),
-            recallPerPath
-        );
+        const list = rankByScoreDesc(rows, (row) => titleMatchScore(row.title, query), recallPerPath);
         chunksByPath.title = list;
         pathTopIds.title = list.map((c) => c.metadata.embeddingId);
     }
 
+    return {chunksByPath, pathTopIds};
+}
+
+function mergeRecallChunks(
+    paths: RecallPathId[],
+    chunksByPath: Record<RecallPathId, MultiRecallChunk[]>,
+    fusion: MultiRecallOptions["fusion"],
+    opts: MultiRecallOptions,
+    finalK: number
+): MultiRecallChunk[] {
     const idToChunk = new Map<number, MultiRecallChunk>();
     for (const p of paths) {
         for (const c of chunksByPath[p] ?? []) {
@@ -320,7 +303,6 @@ export async function multiRecallChunks(query: string, opts: MultiRecallOptions)
     }
 
     let fusedScores = new Map<number, number>();
-
     if (fusion === "rrf") {
         const ranksByPath = new Map<RecallPathId, Map<number, number>>();
         for (const p of paths) {
@@ -332,19 +314,48 @@ export async function multiRecallChunks(query: string, opts: MultiRecallOptions)
         fusedScores = weightedSumFuse(chunksByPath, paths, w as Record<RecallPathId, number>);
     }
 
-    const merged = [...idToChunk.entries()]
+    return [...idToChunk.entries()]
         .map(([id, chunk]) => ({id, chunk, fs: fusedScores.get(id) ?? 0}))
         .sort((a, b) => b.fs - a.fs)
         .slice(0, finalK)
         .map(({chunk, fs}) => ({...chunk, score: fs}));
+}
 
-    const meta: MultiRecallMeta = {
-        fusion,
-        pathTopIds,
-        ...(opts.debug ? {byPath: chunksByPath} : {}),
+/**
+ * 多路召回 + 融合。默认从库中最多拉取 2000 条候选再在内存中打分（与现有单路策略同量级）。
+ */
+export async function multiRecallChunks(query: string, opts: MultiRecallOptions): Promise<MultiRecallResult> {
+    const recallPerPath = opts.recallPerPath ?? 24;
+    const finalK = opts.finalK ?? 8;
+    const minVectorScore = opts.minVectorScore ?? 0.15;
+    const paths: RecallPathId[] = opts.paths?.length ? opts.paths : ["vector", "keyword", "title"];
+    const fusion = opts.fusion ?? "rrf";
+
+    if (!query.trim() || opts.userId == null) {
+        return {
+            chunks: [],
+            meta: {fusion, pathTopIds: {}, ...(opts.debug ? {byPath: {}} : {})},
+        };
+    }
+
+    const rows = await fetchCandidates(opts.userId, opts.knowledgeBaseId, opts.documentId, 2000);
+    const {chunksByPath, pathTopIds} = await buildRecallByPath(
+        query,
+        rows,
+        paths,
+        recallPerPath,
+        minVectorScore
+    );
+    const merged = mergeRecallChunks(paths, chunksByPath, fusion, opts, finalK);
+
+    return {
+        chunks: merged,
+        meta: {
+            fusion,
+            pathTopIds,
+            ...(opts.debug ? {byPath: chunksByPath} : {}),
+        },
     };
-
-    return {chunks: merged, meta};
 }
 
 /**

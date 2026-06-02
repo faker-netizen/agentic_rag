@@ -97,21 +97,48 @@ class ChunkUploadService {
         }
 
         if (params.fileHash) {
-            const existing = await this.findInstantDocument(
-                params.userId,
-                params.knowledgeBaseId,
-                params.fileHash
-            );
-            if (existing != null) {
-                return {
-                    fileId: newFileId(),
-                    uploadedChunkIndexes: [],
-                    instant: true,
-                    documentId: existing,
-                };
-            }
+            const instant = await this.tryInstantUpload(params);
+            if (instant) return instant;
         }
 
+        return this.createNewUploadSession(params);
+    }
+
+    private async tryInstantUpload(params: {
+        userId: number;
+        knowledgeBaseId: number;
+        fileHash?: string;
+    }): Promise<{
+        fileId: string;
+        uploadedChunkIndexes: number[];
+        instant: true;
+        documentId: number;
+    } | null> {
+        if (!params.fileHash) return null;
+        const existing = await this.findInstantDocument(
+            params.userId,
+            params.knowledgeBaseId,
+            params.fileHash
+        );
+        if (existing == null) return null;
+        return {
+            fileId: newFileId(),
+            uploadedChunkIndexes: [],
+            instant: true,
+            documentId: existing,
+        };
+    }
+
+    private async createNewUploadSession(params: {
+        userId: number;
+        knowledgeBaseId: number;
+        fileName: string;
+        fileSize: number;
+        chunkSize: number;
+        totalChunks: number;
+        fileHash?: string;
+        title?: string;
+    }): Promise<{fileId: string; uploadedChunkIndexes: number[]}> {
         const fileId = newFileId();
         await fs.mkdir(sessionDir(fileId), {recursive: true});
 
@@ -211,17 +238,33 @@ class ChunkUploadService {
         }
 
         const uploaded = await this.listUploadedChunkIndexes(fileId, userId);
+        this.assertMergeComplete(session, uploaded);
+
+        const mergedPath = await this.writeMergedFile(session, fileId);
+        const documentId = await this.persistMergedDocument(session, mergedPath, userId);
+
+        await pool.query<ResultSetHeader>(
+            `UPDATE upload_sessions SET status = 'merged' WHERE file_id = ?`,
+            [fileId]
+        );
+
+        await this.cleanupChunks(fileId);
+        return {documentId, filePath: mergedPath};
+    }
+
+    private assertMergeComplete(session: UploadSessionRow, uploaded: number[]): void {
         if (uploaded.length !== session.total_chunks) {
             const missing = session.total_chunks - uploaded.length;
             throw new Error(`分片未传齐，还差 ${missing} 个分片`);
         }
-
         for (let i = 0; i < session.total_chunks; i++) {
             if (!uploaded.includes(i)) {
                 throw new Error(`缺少分片 ${i}`);
             }
         }
+    }
 
+    private async writeMergedFile(session: UploadSessionRow, fileId: string): Promise<string> {
         const uploadsDir = path.join(__dirname, "../../uploads");
         await fs.mkdir(uploadsDir, {recursive: true});
         const safeBase = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -233,7 +276,15 @@ class ChunkUploadService {
             if (i === 0) await fs.writeFile(mergedPath, part);
             else await fs.appendFile(mergedPath, part);
         }
+        return mergedPath;
+    }
 
+    private async persistMergedDocument(
+        session: UploadSessionRow,
+        mergedPath: string,
+        userId: number
+    ): Promise<number> {
+        const ext = path.extname(session.file_name).toLowerCase();
         const title =
             (session.title && session.title.trim()) ||
             path.basename(session.file_name, ext) ||
@@ -254,14 +305,7 @@ class ChunkUploadService {
                 [userId, session.knowledge_base_id, session.file_hash, documentId]
             );
         }
-
-        await pool.query<ResultSetHeader>(
-            `UPDATE upload_sessions SET status = 'merged' WHERE file_id = ?`,
-            [fileId]
-        );
-
-        await this.cleanupChunks(fileId);
-        return {documentId, filePath: mergedPath};
+        return documentId;
     }
 
     async cancel(fileId: string, userId: number): Promise<void> {

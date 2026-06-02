@@ -92,8 +92,6 @@ function normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
 }
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /**
  * 注册新用户（邮箱唯一、密码 bcrypt）
  * @returns ok + user，或 duplicate / invalid_input
@@ -189,6 +187,31 @@ export async function rotateRefreshToken(rawRefreshToken: string): Promise<{
     refreshToken: string;
     refreshExpiresAt: Date;
 } | null> {
+    const rt = await loadActiveRefreshToken(rawRefreshToken);
+    if (!rt) return null;
+
+    const user: AuthUser = {id: rt.user_id, email: rt.email};
+    const next = await issueTokenPair(user);
+    const nextHash = sha256Hex(next.refreshToken);
+
+    await pool.query(
+        "UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP, replaced_by_token_hash = ? WHERE id = ?",
+        [nextHash, rt.id]
+    );
+
+    return {
+        user,
+        accessToken: next.accessToken,
+        refreshToken: next.refreshToken,
+        refreshExpiresAt: next.refreshExpiresAt,
+    };
+}
+
+async function loadActiveRefreshToken(rawRefreshToken: string): Promise<{
+    id: number;
+    user_id: number;
+    email: string;
+} | null> {
     const tokenHash = sha256Hex(rawRefreshToken);
     const [rows] = await pool.query(
         `
@@ -208,27 +231,9 @@ export async function rotateRefreshToken(rawRefreshToken: string): Promise<{
         email: string;
     }>;
     const rt = rts[0];
-    if (!rt) return null;
-    if (rt.revoked_at) return null;
+    if (!rt || rt.revoked_at) return null;
     if (new Date(rt.expires_at).getTime() <= Date.now()) return null;
-
-    const user: AuthUser = {id: rt.user_id, email: rt.email};
-
-    // 轮换：撤销旧 token，并签发新 token（并记录 replaced_by）
-    const next = await issueTokenPair(user);
-    const nextHash = sha256Hex(next.refreshToken);
-
-    await pool.query(
-        "UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP, replaced_by_token_hash = ? WHERE id = ?",
-        [nextHash, rt.id]
-    );
-
-    return {
-        user,
-        accessToken: next.accessToken,
-        refreshToken: next.refreshToken,
-        refreshExpiresAt: next.refreshExpiresAt
-    };
+    return {id: rt.id, user_id: rt.user_id, email: rt.email};
 }
 
 export async function revokeRefreshToken(rawRefreshToken: string): Promise<void> {

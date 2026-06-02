@@ -5,7 +5,7 @@
     "dev:frontend": "pnpm -C apps/web dev",
     "dev:backend": "pnpm -C apps/backend dev",
     "build": "pnpm -r build",
-    "lint": "pnpm -C apps/web exec eslint . --max-warnings=0 && pnpm -C apps/backend exec tsc --noEmit",
+    "lint": "pnpm -C apps/web exec eslint . --max-warnings=0 && pnpm -C apps/backend lint",
     "typecheck": "pnpm -C apps/backend exec tsc --noEmit && pnpm -C apps/web exec tsc -b --noEmit",
     "test:e2e": "playwright test -c e2e/playwright.config.mts",
     "test:e2e:smoke": "playwright test -c e2e/playwright.config.mts --grep @smoke",

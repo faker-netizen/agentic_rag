@@ -16,11 +16,12 @@ pnpm test:e2e:smoke   # 本地可选；CI 在 MySQL + Playwright job 中跑
 
 ### lint-staged 范围
 
-- `apps/web/**/*.{ts,tsx}`
+- `apps/web/**/*.{ts,tsx}` — ESLint（结构规则；`max-lines-per-function` ≤80 待启用）
 - `packages/components/**/*.{ts,tsx}`
+- `apps/backend/**/*.ts` — ESLint（含 `max-lines-per-function` ≤40）+ `tsc --noEmit`
 - `--max-warnings=0`（warning 也算失败）
 
-**pre-commit 不覆盖：** `apps/backend`、纯 CSS、JSON、配置文件 — 需手动跑 `pnpm build` 或 backend `tsc`。
+**pre-commit 不覆盖：** 纯 CSS、JSON、配置文件 — 较大 backend 变更仍建议 `pnpm build`。
 
 ### 含 backend 变更时
 

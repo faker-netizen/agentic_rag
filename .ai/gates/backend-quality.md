@@ -5,13 +5,16 @@
 ## 自动化（必须通过）
 
 ```bash
+pnpm -C apps/backend lint          # ESLint：no-any、ban-ts-comment、max-lines-per-function ≤40
 pnpm -C apps/backend exec tsc --noEmit
 pnpm build
 ```
 
+`pnpm lint`（根目录 / CI）已包含 backend ESLint。
+
 ## 函数与 Service 结构
 
-- [ ] **无超过 40 行的函数**（不含空行/注释），或已拆分且公开方法变短
+- [ ] **无超过 40 行的函数**（不含空行/注释），或已拆分且公开方法变短 — **ESLint `max-lines-per-function` 强制执行**
 - [ ] 每个函数 **单一职责**（未在同一函数内混 SQL + RAG/外部 API + 多段业务分支）
 - [ ] Service **公开方法** 以编排为主，读起来像步骤列表
 - [ ] **无 copy-paste**：相同逻辑（history、sources、title 更新等）已抽取共享

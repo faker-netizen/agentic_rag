@@ -1,5 +1,4 @@
 import {RecursiveCharacterTextSplitter} from "@langchain/textsplitters";
-import {ChatPromptTemplate} from "@langchain/core/prompts";
 import {ChatOpenAI} from "@langchain/openai";
 import VectorIndex from "../config/vectorIndex.js";
 import {Document} from "@langchain/core/documents";
@@ -76,6 +75,59 @@ function buildRagGenerationMessages(
     return msgs;
 }
 
+function validateEmbeddingBatch(texts: string[], vectors: number[][]): void {
+    if (vectors.length !== texts.length) {
+        throw new Error(`embed result mismatch: texts=${texts.length}, vectors=${vectors.length}`);
+    }
+    const dim = vectors[0]?.length ?? 0;
+    if (!dim) throw new Error("empty embedding vector");
+    for (const v of vectors) {
+        if (!Array.isArray(v) || v.length !== dim) {
+            throw new Error("invalid embedding dimension");
+        }
+    }
+}
+
+function scoreEmbeddingCandidates(
+    candidates: EmbeddingRow[],
+    queryVec: number[],
+    minScore: number,
+    k: number
+): RagChunkItem[] {
+    const scored: RagChunkItem[] = [];
+    for (const row of candidates) {
+        const vec = row.embedding;
+        if (!Array.isArray(vec) || vec.length !== queryVec.length) continue;
+        const score = VectorIndex.cosineSimilarity(queryVec, vec);
+        if (!Number.isFinite(score) || score < minScore) continue;
+        scored.push({
+            content: row.chunk_text,
+            metadata: {documentId: row.document_id, embeddingId: row.id},
+            score,
+        });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, k);
+}
+
+function buildEmbeddingScopeFilter(opts?: {
+    documentId?: number;
+    knowledgeBaseId?: number;
+    userId?: number;
+}): {parts: string[]; args: unknown[]} {
+    const args: unknown[] = [opts?.userId];
+    const parts = ["d.user_id = ?"];
+    if (opts?.knowledgeBaseId != null) {
+        parts.push("d.knowledge_base_id = ?");
+        args.push(opts.knowledgeBaseId);
+    }
+    if (opts?.documentId) {
+        parts.push("e.document_id = ?");
+        args.push(opts.documentId);
+    }
+    return {parts, args};
+}
+
 class RAGService {
     async ingestDocument(params: {
         text: string;
@@ -104,20 +156,7 @@ class RAGService {
             if (!texts.length) return;
 
             const vectors = await VectorIndex.embedTexts(texts);
-            if (vectors.length !== texts.length) {
-                throw new Error(
-                    `embed result mismatch: texts=${texts.length}, vectors=${vectors.length}`
-                );
-            }
-
-            const dim = vectors[0]?.length ?? 0;
-            if (!dim) throw new Error("empty embedding vector");
-            for (const v of vectors) {
-                if (!Array.isArray(v) || v.length !== dim) {
-                    throw new Error("invalid embedding dimension");
-                }
-            }
-
+            validateEmbeddingBatch(texts, vectors);
             await this.insertEmbeddingRows(params.documentId, texts, vectors);
         } catch (error) {
             console.error("[RAG] ingestDocument failed:", error);
@@ -173,18 +212,7 @@ class RAGService {
             const [queryVec] = await VectorIndex.embedTexts([query]);
             if (!queryVec || !queryVec.length) return [];
 
-            const args: unknown[] = [opts.userId];
-            const parts = ["d.user_id = ?"];
-
-            if (opts.knowledgeBaseId != null) {
-                parts.push("d.knowledge_base_id = ?");
-                args.push(opts.knowledgeBaseId);
-            }
-            if (opts.documentId) {
-                parts.push("e.document_id = ?");
-                args.push(opts.documentId);
-            }
-
+            const {parts, args} = buildEmbeddingScopeFilter(opts);
             const sql = `
                 SELECT e.id, e.document_id, e.chunk_text, e.embedding
                 FROM embeddings e
@@ -194,26 +222,7 @@ class RAGService {
             `;
 
             const [rows] = await pool.query(sql, args);
-            const candidates = rows as EmbeddingRow[];
-            const scored: RagChunkItem[] = [];
-
-            for (const row of candidates) {
-                const vec = row.embedding;
-                if (!Array.isArray(vec) || vec.length !== queryVec.length) continue;
-                const score = VectorIndex.cosineSimilarity(queryVec, vec);
-                if (!Number.isFinite(score)) continue;
-                if (score < minScore) continue;
-                scored.push({
-                    content: row.chunk_text,
-                    metadata: {
-                        documentId: row.document_id,
-                        embeddingId: row.id,
-                    },
-                    score,
-                });
-            }
-            scored.sort((a, b) => b.score - a.score);
-            return scored.slice(0, k);
+            return scoreEmbeddingCandidates(rows as EmbeddingRow[], queryVec, minScore, k);
         } catch (error) {
             console.error("[RAG] retrieveRelevantChunks failed:", error);
             throw error;
@@ -262,25 +271,41 @@ class RAGService {
             },
         });
         const chunks = state.chunks as RagChunkItem[];
-        yield {type: "context", chunks: this.shouldUsePlainChatFallback({chunks, evalResult: state.evalResult}) ? [] : chunks};
-        if (this.shouldUsePlainChatFallback({chunks, evalResult: state.evalResult})) {
-            for await (const delta of this.streamChatPlain(query, history, opts?.signal, {
-                ragFallback: true,
-            })) {
-                yield {type: "token", text: delta};
-            }
+        const usePlain = this.shouldUsePlainChatFallback({chunks, evalResult: state.evalResult});
+        yield {type: "context", chunks: usePlain ? [] : chunks};
+        if (usePlain) {
+            yield* this.yieldPlainTokens(query, history, opts?.signal, {ragFallback: true});
             return;
         }
 
+        yield* this.yieldRagTokens(query, chunks, history, opts?.signal);
+    }
+
+    private async *yieldPlainTokens(
+        query: string,
+        history: RagChatHistory,
+        signal: AbortSignal | undefined,
+        options: {ragFallback?: boolean}
+    ): AsyncGenerator<RagStreamPart> {
+        for await (const delta of this.streamChatPlain(query, history, signal, options)) {
+            yield {type: "token", text: delta};
+        }
+    }
+
+    private async *yieldRagTokens(
+        query: string,
+        chunks: RagChunkItem[],
+        history: RagChatHistory,
+        signal?: AbortSignal
+    ): AsyncGenerator<RagStreamPart> {
         const llm = createLLM();
         const context = chunks
             .map((c, i) => `片段${i + 1}(score=${c.score.toFixed(3)}):\n${c.content}`)
             .join("\n\n");
-
         const messages = buildRagGenerationMessages(query, context, history);
 
         try {
-            const stream = await llm.stream(messages, {signal: opts?.signal});
+            const stream = await llm.stream(messages, {signal});
             for await (const chunk of stream) {
                 const text = messageChunkToText(chunk as AIMessageChunk);
                 if (text) yield {type: "token", text};

@@ -4,5 +4,8 @@ export default {
   'packages/components/**/*.{ts,tsx}':
     'pnpm -C apps/web exec eslint --fix --max-warnings=0',
   // tsc 必须全项目检查；lint-staged 传入单文件会触发 TS5112（TypeScript 6）
-  'apps/backend/**/*.ts': () => 'pnpm -C apps/backend exec tsc --noEmit',
+  'apps/backend/**/*.ts': [
+    'pnpm -C apps/backend exec eslint --fix --max-warnings=0',
+    () => 'pnpm -C apps/backend exec tsc --noEmit',
+  ],
 };

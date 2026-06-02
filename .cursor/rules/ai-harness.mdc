@@ -51,7 +51,7 @@ alwaysApply: true
 ## 硬门禁（不可跳过）
 
 - **GitHub Actions**（`.github/workflows/ci.yml`）：`pnpm lint` → `pnpm build` → `pnpm test:e2e:smoke`（MySQL service + Playwright）
-- **pre-commit**：Husky → lint-staged → 对已暂存 `apps/web` / `packages/components` 的 TS/TSX 跑 ESLint
+- **pre-commit**：Husky → lint-staged → web/components ESLint；backend ESLint + `tsc`
 - **User rules**：禁止 `ts-ignore`、禁止随意 `any`、组件必须 TypeScript、请求需处理 loading/error/empty
 
 ## 项目 Skills 清单（`.cursor/skills/`）

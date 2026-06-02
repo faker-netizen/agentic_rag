@@ -19,7 +19,7 @@ pnpm build
 
 ## 函数与组件结构
 
-- [ ] **无超过 80 行的函数 / 自定义 hook**（不含空行/注释），或已拆分
+- [ ] **无超过 80 行的函数 / 自定义 hook**（不含空行/注释），或已拆分 — gate 清单；**ESLint 规则待存量拆分后启用**
 - [ ] **JSX 以布局与组合为主**，无大段 inline 业务逻辑
 - [ ] 复杂 `onClick` / `useEffect` 已具名或收入 hook
 - [ ] 页面级 **请求 + loading + error** 不在 JSX 里散写，有 hook 或 service 层

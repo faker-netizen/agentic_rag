@@ -5,6 +5,8 @@ import {fileURLToPath} from 'url';
 import knowledgeBaseService from '../services/knowledgeBaseService.js';
 import documentService from '../services/documentService.js';
 import {decodeMultipartUtf8} from '../utils/multipartUtf8.js';
+import {parseRouteParamId, requireUserId} from '../utils/routeHelpers.js';
+import {deleteStoredFile} from '../storage/localFileStorage.js';
 import chunkUploadRoutes from './chunkUploads.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,22 +43,6 @@ const upload = multer({
     },
     limits: {fileSize: 50 * 1024 * 1024},
 });
-
-function requireUserId(req: express.Request, res: express.Response): number | null {
-    const uid = req.user?.id;
-    if (uid == null || !Number.isFinite(uid)) {
-        res.status(401).json({error: '未登录'});
-        return null;
-    }
-    return uid;
-}
-
-function parseKbId(raw: string | string[] | undefined): number | null {
-    const s = Array.isArray(raw) ? raw[0] : raw;
-    if (s == null || typeof s !== "string") return null;
-    const n = Number(s);
-    return Number.isFinite(n) && n > 0 ? n : null;
-}
 
 /** GET /api/knowledge-bases */
 router.get('/', async (req, res) => {
@@ -98,7 +84,7 @@ router.get('/:kbId', async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId(req.params.kbId);
+        const kbId = parseRouteParamId(req.params.kbId);
         if (kbId == null) return res.status(400).json({error: '无效的知识库 id'});
         const kb = await knowledgeBaseService.getOwned(userId, kbId);
         if (!kb) return res.status(404).json({error: '知识库不存在'});
@@ -114,7 +100,7 @@ router.delete('/:kbId', async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId(req.params.kbId);
+        const kbId = parseRouteParamId(req.params.kbId);
         if (kbId == null) return res.status(400).json({error: '无效的知识库 id'});
         const ok = await knowledgeBaseService.delete(userId, kbId);
         if (!ok) return res.status(404).json({error: '知识库不存在'});
@@ -130,7 +116,7 @@ router.get('/:kbId/documents', async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId(req.params.kbId);
+        const kbId = parseRouteParamId(req.params.kbId);
         if (kbId == null) return res.status(400).json({error: '无效的知识库 id'});
         const kb = await knowledgeBaseService.getOwned(userId, kbId);
         if (!kb) return res.status(404).json({error: '知识库不存在'});
@@ -144,14 +130,15 @@ router.get('/:kbId/documents', async (req, res) => {
 
 /** POST /api/knowledge-bases/:kbId/upload */
 router.post('/:kbId/upload', upload.single('file'), async (req, res) => {
+    const uploadedPath = req.file?.path;
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId(req.params.kbId);
+        const kbId = parseRouteParamId(req.params.kbId);
         if (kbId == null) return res.status(400).json({error: '无效的知识库 id'});
         const kb = await knowledgeBaseService.getOwned(userId, kbId);
         if (!kb) return res.status(404).json({error: '知识库不存在'});
-        if (!req.file) {
+        if (!req.file || !uploadedPath) {
             return res.status(400).json({error: '没有上传文件'});
         }
         const rawTitle = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
@@ -160,15 +147,19 @@ router.post('/:kbId/upload', upload.single('file'), async (req, res) => {
             decodeMultipartUtf8(req.file.originalname) ||
             '未命名';
         const documentId = await documentService.processAndSaveDocument(
-            req.file.path,
+            uploadedPath,
             title,
             userId,
             kbId
         );
         res.json({success: true, documentId, message: '文档上传并处理成功'});
     } catch (error) {
+        if (uploadedPath) {
+            await deleteStoredFile(uploadedPath);
+        }
         console.error('upload document failed:', error);
-        res.status(500).json({error: '上传文档失败'});
+        const msg = error instanceof Error ? error.message : '上传文档失败';
+        res.status(500).json({error: msg});
     }
 });
 
@@ -177,8 +168,8 @@ router.get('/:kbId/documents/:docId', async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId(req.params.kbId);
-        const docId = parseKbId(req.params.docId);
+        const kbId = parseRouteParamId(req.params.kbId);
+        const docId = parseRouteParamId(req.params.docId);
         if (kbId == null || docId == null) {
             return res.status(400).json({error: '无效的 id'});
         }
@@ -198,8 +189,8 @@ router.delete('/:kbId/documents/:docId', async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId(req.params.kbId);
-        const docId = parseKbId(req.params.docId);
+        const kbId = parseRouteParamId(req.params.kbId);
+        const docId = parseRouteParamId(req.params.docId);
         if (kbId == null || docId == null) {
             return res.status(400).json({error: '无效的 id'});
         }

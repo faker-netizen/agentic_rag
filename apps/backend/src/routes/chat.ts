@@ -1,24 +1,9 @@
 import express from "express";
 import chatService from "../services/chatService.js";
+import {parseRouteParamId, requireUserId} from "../utils/routeHelpers.js";
 import {bindRequestAbort, createSseWriter, setupSseResponse} from "../utils/sse.js";
 
 const router = express.Router();
-
-function requireUserId(req: express.Request, res: express.Response): number | null {
-    const uid = req.user?.id;
-    if (uid == null || !Number.isFinite(uid)) {
-        res.status(401).json({error: "未登录"});
-        return null;
-    }
-    return uid;
-}
-
-function parseId(raw: string | string[] | undefined): number | null {
-    const s = Array.isArray(raw) ? raw[0] : raw;
-    if (s == null || typeof s !== "string") return null;
-    const n = Number(s);
-    return Number.isFinite(n) && n > 0 ? n : null;
-}
 
 /** POST /api/chat/sessions  { knowledgeBaseId?, title? } */
 router.post("/sessions", async (req, res) => {
@@ -67,7 +52,7 @@ router.get("/sessions/:sessionId", async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const sessionId = parseId(req.params.sessionId);
+        const sessionId = parseRouteParamId(req.params.sessionId);
         if (sessionId == null) return res.status(400).json({error: "无效的会话 id"});
         const session = await chatService.getSession(userId, sessionId);
         if (!session) return res.status(404).json({error: "会话不存在"});
@@ -83,7 +68,7 @@ router.patch("/sessions/:sessionId", async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const sessionId = parseId(req.params.sessionId);
+        const sessionId = parseRouteParamId(req.params.sessionId);
         if (sessionId == null) return res.status(400).json({error: "无效的会话 id"});
         const title = req.body?.title;
         if (typeof title !== "string" || !title.trim()) {
@@ -103,7 +88,7 @@ router.delete("/sessions/:sessionId", async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const sessionId = parseId(req.params.sessionId);
+        const sessionId = parseRouteParamId(req.params.sessionId);
         if (sessionId == null) return res.status(400).json({error: "无效的会话 id"});
         const ok = await chatService.deleteSession(userId, sessionId);
         if (!ok) return res.status(404).json({error: "会话不存在"});
@@ -119,7 +104,7 @@ router.get("/sessions/:sessionId/messages", async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const sessionId = parseId(req.params.sessionId);
+        const sessionId = parseRouteParamId(req.params.sessionId);
         if (sessionId == null) return res.status(400).json({error: "无效的会话 id"});
         const session = await chatService.getSession(userId, sessionId);
         if (!session) return res.status(404).json({error: "会话不存在"});
@@ -136,7 +121,7 @@ router.post("/sessions/:sessionId/messages", async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const sessionId = parseId(req.params.sessionId);
+        const sessionId = parseRouteParamId(req.params.sessionId);
         if (sessionId == null) return res.status(400).json({error: "无效的会话 id"});
         const content = req.body?.content;
         if (typeof content !== "string" || !content.trim()) {
@@ -150,7 +135,7 @@ router.post("/sessions/:sessionId/messages", async (req, res) => {
         const sse = createSseWriter(res);
 
         try {
-            await chatService.appendMessage(userId, session, content, sse, signal);
+            await chatService.appendMessage({userId, session, content, sse, signal});
         } catch (e) {
             const message = e instanceof Error ? e.message : "发送失败";
             sse("error", {message});

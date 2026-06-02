@@ -6,6 +6,7 @@
 
 - [ ] 范围清晰：涉及哪些 packages、路由/接口
 - [ ] 已调研现有代码（grep/读邻近文件）；优先复用
+- [ ] 非 trivial 需求已通过 `design-review` gate，或用户明确免设计
 - [ ] 已有计划，或用户明确免计划
 - [ ] 涉及 API 变更 → 将阅读 `api-contract` gate
 - [ ] 涉及 UI 变更 → 将阅读 `ui-quality` gate

@@ -14,7 +14,7 @@ alwaysApply: false
 
 ## 函数与组件粒度
 
-- 单个函数 / 自定义 hook **≤ 40 行**（不含空行与注释）；超出必须拆分
+- 单个函数 / 自定义 hook **≤ 80 行**（不含空行与注释）；超出必须拆分 — **ESLint 强制执行**
 - **禁止** 在 JSX 内写大段逻辑（复杂 `onClick`、嵌套三元、内联 async）
 - 页面组件 = **编排 + 布局**；数据请求、流式、表单状态抽到 `useXxx` hook
 - 相同 UI 块 / 处理逻辑出现 **≥ 2 次** → 抽子组件或 hook，禁止 copy-paste
@@ -22,8 +22,8 @@ alwaysApply: false
 
 ## UI 与主题
 
-- 页内滚动：`.cursor/rules/scrollable-layout.mdc` + `~/.cursor/skills/scrollable-layout/SKILL.md`
-- macOS / 玻璃 UI：优先 `shell/`、`desktop/` 模式
+- 布局 CSS：`css-layout` skill；页内滚动：`scrollable-layout` skill（或 `scrollable-layout.mdc` rule）
+- macOS / 玻璃 UI：`macbook-ui` skill；优先复用 `shell/`、`desktop/`
 - 主题：`theme/tokens.css`、`antdTheme.ts`
 
 ## 拆分与完成前

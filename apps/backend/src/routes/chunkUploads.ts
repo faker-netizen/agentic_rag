@@ -2,7 +2,8 @@ import express from "express";
 import multer from "multer";
 import knowledgeBaseService from "../services/knowledgeBaseService.js";
 import chunkUploadService from "../services/chunkUploadService.js";
-import {decodeMultipartUtf8} from "../utils/multipartUtf8.js";
+import {parseRouteParamId, requireUserId} from "../utils/routeHelpers.js";
+import {parsePrepareBody, type PrepareBodyInput} from "./chunkUploadPrepare.js";
 
 type KbUploadParams = {kbId: string; fileId?: string};
 
@@ -13,91 +14,74 @@ const chunkMem = multer({
     limits: {fileSize: 20 * 1024 * 1024},
 });
 
-function requireUserId(req: express.Request, res: express.Response): number | null {
-    const uid = req.user?.id;
-    if (uid == null || !Number.isFinite(uid)) {
-        res.status(401).json({error: "未登录"});
-        return null;
-    }
-    return uid;
-}
-
-function parseKbId(raw: string | string[] | undefined): number | null {
-    const s = Array.isArray(raw) ? raw[0] : raw;
-    if (s == null || typeof s !== "string") return null;
-    const n = Number(s);
-    return Number.isFinite(n) && n > 0 ? n : null;
-}
-
 async function assertKbOwned(userId: number, kbId: number): Promise<boolean> {
     const kb = await knowledgeBaseService.getOwned(userId, kbId);
     return kb != null;
 }
 
-/** POST /api/knowledge-bases/:kbId/uploads/prepare */
-router.post("/prepare", async (req, res) => {
-    try {
-        const userId = requireUserId(req, res);
-        if (userId == null) return;
-        const kbId = parseKbId((req.params as KbUploadParams).kbId);
-        if (kbId == null) return res.status(400).json({error: "无效的知识库 id"});
-        if (!(await assertKbOwned(userId, kbId))) {
-            return res.status(404).json({error: "知识库不存在"});
-        }
+async function respondUploadPrepare(
+    res: express.Response,
+    userId: number,
+    body: PrepareBodyInput,
+    kbId: number
+): Promise<void> {
+    const result = await chunkUploadService.prepare({
+        userId,
+        knowledgeBaseId: kbId,
+        fileName: body.fileName,
+        fileSize: body.fileSize,
+        chunkSize: body.chunkSize,
+        totalChunks: body.totalChunks,
+        fileHash: body.fileHash,
+        title: body.title,
+        fileId: body.resumeFileId || undefined,
+    });
 
-        const body = req.body ?? {};
-        const fileName = typeof body.fileName === "string" ? body.fileName.trim() : "";
-        const fileSize = Number(body.fileSize);
-        const chunkSize = Number(body.chunkSize);
-        const totalChunks = Number(body.totalChunks);
-        const fileHash = typeof body.fileHash === "string" ? body.fileHash.trim() : undefined;
-        const title = typeof body.title === "string" ? body.title.trim() : undefined;
-        const resumeFileId = typeof body.fileId === "string" ? body.fileId.trim() : undefined;
-
-        if (!fileName) return res.status(400).json({error: "fileName 不能为空"});
-        if (!Number.isFinite(fileSize) || fileSize < 0) {
-            return res.status(400).json({error: "fileSize 无效"});
-        }
-        if (!Number.isFinite(chunkSize) || chunkSize <= 0) {
-            return res.status(400).json({error: "chunkSize 无效"});
-        }
-        if (!Number.isFinite(totalChunks) || totalChunks <= 0) {
-            return res.status(400).json({error: "totalChunks 无效"});
-        }
-
-        const result = await chunkUploadService.prepare({
-            userId,
-            knowledgeBaseId: kbId,
-            fileName,
-            fileSize,
-            chunkSize,
-            totalChunks,
-            fileHash,
-            title,
-            fileId: resumeFileId || undefined,
-        });
-
-        if (result.instant) {
-            return res.json({
-                success: true,
-                fileId: result.fileId,
-                uploadedChunkIndexes: [],
-                instant: true,
-                documentId: result.documentId,
-            });
-        }
-
-        const uploadedChunkIndexes =
-            resumeFileId && result.uploadedChunkIndexes
-                ? result.uploadedChunkIndexes
-                : await chunkUploadService.listUploadedChunkIndexes(result.fileId, userId);
-
+    if (result.instant) {
         res.json({
             success: true,
             fileId: result.fileId,
-            uploadedChunkIndexes,
-            instant: false,
+            uploadedChunkIndexes: [],
+            instant: true,
+            documentId: result.documentId,
         });
+        return;
+    }
+
+    const uploadedChunkIndexes =
+        body.resumeFileId && result.uploadedChunkIndexes
+            ? result.uploadedChunkIndexes
+            : await chunkUploadService.listUploadedChunkIndexes(result.fileId, userId);
+
+    res.json({success: true, fileId: result.fileId, uploadedChunkIndexes, instant: false});
+}
+
+async function handleUploadPrepare(req: express.Request, res: express.Response): Promise<void> {
+    const userId = requireUserId(req, res);
+    if (userId == null) return;
+    const kbId = parseRouteParamId((req.params as KbUploadParams).kbId);
+    if (kbId == null) {
+        res.status(400).json({error: "无效的知识库 id"});
+        return;
+    }
+    if (!(await assertKbOwned(userId, kbId))) {
+        res.status(404).json({error: "知识库不存在"});
+        return;
+    }
+
+    const parsed = parsePrepareBody(req.body);
+    if (!parsed.ok) {
+        res.status(400).json({error: parsed.error});
+        return;
+    }
+
+    await respondUploadPrepare(res, userId, parsed.value, kbId);
+}
+
+/** POST /api/knowledge-bases/:kbId/uploads/prepare */
+router.post("/prepare", async (req, res) => {
+    try {
+        await handleUploadPrepare(req, res);
     } catch (e) {
         const msg = e instanceof Error ? e.message : "初始化上传失败";
         console.error("upload prepare failed:", e);
@@ -110,7 +94,7 @@ router.post("/chunk", chunkMem.single("chunk"), async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId((req.params as KbUploadParams).kbId);
+        const kbId = parseRouteParamId((req.params as KbUploadParams).kbId);
         if (kbId == null) return res.status(400).json({error: "无效的知识库 id"});
 
         const fileId = typeof req.body?.fileId === "string" ? req.body.fileId.trim() : "";
@@ -142,7 +126,7 @@ router.post("/merge", async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId((req.params as KbUploadParams).kbId);
+        const kbId = parseRouteParamId((req.params as KbUploadParams).kbId);
         if (kbId == null) return res.status(400).json({error: "无效的知识库 id"});
 
         const fileId = typeof req.body?.fileId === "string" ? req.body.fileId.trim() : "";
@@ -204,7 +188,7 @@ router.get("/:fileId/status", async (req, res) => {
             totalChunks: session.total_chunks,
             status: session.status,
         });
-    } catch (e) {
+    } catch {
         res.status(500).json({error: "获取上传状态失败"});
     }
 });

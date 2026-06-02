@@ -7,6 +7,17 @@ import crypto from "crypto";
 import type {ResultSetHeader} from "mysql2";
 import pool from "../config/database.js";
 import {authConfig} from "../config/auth.js";
+import {
+    BCRYPT_COST,
+    MAX_PASSWORD_LENGTH,
+    MIN_PASSWORD_LENGTH,
+    MS_PER_DAY,
+    MS_PER_HOUR,
+    MS_PER_MINUTE,
+    MS_PER_SECOND,
+    RANDOM_TOKEN_BYTES,
+    REFRESH_TOKEN_RAW_BYTES,
+} from "./serviceConstants.js";
 
 /**
  * 定义认证用户类型
@@ -32,7 +43,7 @@ function sha256Hex(input: string): string {
  * @param bytes 随机字节数，默认为32
  * @returns 返回base64url编码的随机字符串
  */
-function randomToken(bytes = 32): string {
+function randomToken(bytes = RANDOM_TOKEN_BYTES): string {
     return crypto.randomBytes(bytes).toString("base64url");
 }
 
@@ -57,7 +68,7 @@ function ttlToMs(ttl: string): number {
     const n = Number(m[1]);
     const unit = (m[2] || "s").toLowerCase();
     const mult =
-        unit === "s" ? 1000 : unit === "m" ? 60_000 : unit === "h" ? 3_600_000 : 86_400_000;
+        unit === "s" ? MS_PER_SECOND : unit === "m" ? MS_PER_MINUTE : unit === "h" ? MS_PER_HOUR : MS_PER_DAY;
     return n * mult;
 }
 
@@ -92,8 +103,6 @@ function normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
 }
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 /**
  * 注册新用户（邮箱唯一、密码 bcrypt）
  * @returns ok + user，或 duplicate / invalid_input
@@ -111,11 +120,11 @@ export async function registerUser(
     // if (!emailPattern.test(email)) {
     //     return {ok: false, reason: "invalid_input"};
     // }
-    if (password.length < 8 || password.length > 128) {
+    if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
         return {ok: false, reason: "invalid_input"};
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 
     try {
         const [result] = await pool.query<ResultSetHeader>(
@@ -167,7 +176,7 @@ export async function issueTokenPair(user: AuthUser): Promise<{
     // refresh token 采用：随机串 + JWT（双层，便于撤销/轮换与可扩展）
     // 这里用 “随机串” 作为 cookie 内容，DB 存 hash；JWT 用于 future-proof（目前不放 cookie）
     const jti = randomJti();
-    const raw = randomToken(48);
+    const raw = randomToken(REFRESH_TOKEN_RAW_BYTES);
     const tokenHash = sha256Hex(raw);
 
     const refreshMs = ttlToMs(authConfig.refreshTokenTtl);
@@ -189,6 +198,31 @@ export async function rotateRefreshToken(rawRefreshToken: string): Promise<{
     refreshToken: string;
     refreshExpiresAt: Date;
 } | null> {
+    const rt = await loadActiveRefreshToken(rawRefreshToken);
+    if (!rt) return null;
+
+    const user: AuthUser = {id: rt.user_id, email: rt.email};
+    const next = await issueTokenPair(user);
+    const nextHash = sha256Hex(next.refreshToken);
+
+    await pool.query(
+        "UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP, replaced_by_token_hash = ? WHERE id = ?",
+        [nextHash, rt.id]
+    );
+
+    return {
+        user,
+        accessToken: next.accessToken,
+        refreshToken: next.refreshToken,
+        refreshExpiresAt: next.refreshExpiresAt,
+    };
+}
+
+async function loadActiveRefreshToken(rawRefreshToken: string): Promise<{
+    id: number;
+    user_id: number;
+    email: string;
+} | null> {
     const tokenHash = sha256Hex(rawRefreshToken);
     const [rows] = await pool.query(
         `
@@ -208,27 +242,9 @@ export async function rotateRefreshToken(rawRefreshToken: string): Promise<{
         email: string;
     }>;
     const rt = rts[0];
-    if (!rt) return null;
-    if (rt.revoked_at) return null;
+    if (!rt || rt.revoked_at) return null;
     if (new Date(rt.expires_at).getTime() <= Date.now()) return null;
-
-    const user: AuthUser = {id: rt.user_id, email: rt.email};
-
-    // 轮换：撤销旧 token，并签发新 token（并记录 replaced_by）
-    const next = await issueTokenPair(user);
-    const nextHash = sha256Hex(next.refreshToken);
-
-    await pool.query(
-        "UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP, replaced_by_token_hash = ? WHERE id = ?",
-        [nextHash, rt.id]
-    );
-
-    return {
-        user,
-        accessToken: next.accessToken,
-        refreshToken: next.refreshToken,
-        refreshExpiresAt: next.refreshExpiresAt
-    };
+    return {id: rt.id, user_id: rt.user_id, email: rt.email};
 }
 
 export async function revokeRefreshToken(rawRefreshToken: string): Promise<void> {

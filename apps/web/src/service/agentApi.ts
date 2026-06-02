@@ -1,5 +1,7 @@
 import http from "@/service/request.ts";
 
+const MAX_AGENT_STEPS = 16;
+
 export type MiniAgentToolCallRecord = {
     id: string;
     name: string;
@@ -24,7 +26,7 @@ export type MiniAgentRunResult = {
 export async function runMinAgent(message: string, maxSteps?: number): Promise<MiniAgentRunResult> {
     const body: {message: string; maxSteps?: number} = {message: message.trim()};
     if (maxSteps != null && Number.isFinite(maxSteps) && maxSteps > 0) {
-        body.maxSteps = Math.min(16, Math.floor(maxSteps));
+        body.maxSteps = Math.min(MAX_AGENT_STEPS, Math.floor(maxSteps));
     }
     const res = await http.post<
         MiniAgentRunResult & {success: boolean; userId?: number},

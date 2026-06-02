@@ -1,15 +1,10 @@
-import {
-    forwardRef,
-    useCallback,
-    useEffect,
-    useImperativeHandle,
-    useRef,
-    type CSSProperties,
-} from "react";
+import {forwardRef, useImperativeHandle, useRef} from "react";
 import {useVirtualizer} from "@tanstack/react-virtual";
 import {Empty} from "antd";
+import type {CSSProperties} from "react";
 import type {ChatMessage} from "@/service/chatApi.ts";
 import ChatMessageBubble from "@/components/ChatMessageBubble.tsx";
+import {useChatMessageScroll} from "@/components/chatMessageVirtualListUtils.ts";
 
 const ITEM_GAP = 16;
 const ESTIMATE_ROW_HEIGHT = 96;
@@ -26,6 +21,25 @@ export type ChatMessageVirtualListProps = {
     style?: CSSProperties;
     className?: string;
 };
+
+function ChatMessageVirtualEmpty({
+    className,
+    style,
+}: {
+    className?: string;
+    style?: CSSProperties;
+}) {
+    return (
+        <div
+            className={["chat-message-virtual-list", "chat-message-virtual-list--empty", className]
+                .filter(Boolean)
+                .join(" ")}
+            style={style}
+        >
+            <Empty description="发送第一条消息开始聊天" />
+        </div>
+    );
+}
 
 const ChatMessageVirtualList = forwardRef<ChatMessageVirtualListHandle, ChatMessageVirtualListProps>(
     function ChatMessageVirtualList(
@@ -45,37 +59,17 @@ const ChatMessageVirtualList = forwardRef<ChatMessageVirtualListHandle, ChatMess
             getItemKey: (index) => messages[index]?.id ?? index,
         });
 
-        const scrollToBottom = useCallback(
-            (behavior: ScrollBehavior = "smooth") => {
-                if (messages.length === 0) return;
-                virtualizer.scrollToIndex(messages.length - 1, {align: "end", behavior});
-            },
-            [messages.length, virtualizer]
+        const scrollToBottom = useChatMessageScroll(
+            messages,
+            streamingAssistantId,
+            streamDisplay,
+            virtualizer
         );
 
         useImperativeHandle(ref, () => ({scrollToBottom}), [scrollToBottom]);
 
-        useEffect(() => {
-            if (messages.length === 0) return;
-            scrollToBottom(messages.length <= 2 ? "auto" : "smooth");
-        }, [messages.length, scrollToBottom]);
-
-        useEffect(() => {
-            if (streamingAssistantId == null || !streamDisplay) return;
-            scrollToBottom("auto");
-        }, [streamDisplay, streamingAssistantId, scrollToBottom]);
-
         if (messages.length === 0 && !loading) {
-            return (
-                <div
-                    className={["chat-message-virtual-list", "chat-message-virtual-list--empty", className]
-                        .filter(Boolean)
-                        .join(" ")}
-                    style={style}
-                >
-                    <Empty description="发送第一条消息开始聊天" />
-                </div>
-            );
+            return <ChatMessageVirtualEmpty className={className} style={style} />;
         }
 
         return (
@@ -115,9 +109,7 @@ const ChatMessageVirtualList = forwardRef<ChatMessageVirtualListHandle, ChatMess
                                 <ChatMessageBubble
                                     message={message}
                                     isStreaming={isStreaming}
-                                    streamDisplay={
-                                        isStreaming ? streamDisplay : undefined
-                                    }
+                                    streamDisplay={isStreaming ? streamDisplay : undefined}
                                 />
                             </div>
                         );

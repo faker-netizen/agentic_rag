@@ -19,6 +19,7 @@ export default function Dock() {
             <div className="desktop-dock__inner">
                 {DOCK_APPS.map((app) => {
                     const Icon = DOCK_ICONS[app.id];
+                    if (!Icon) return null;
                     const running = isAppOpen(app.id);
                     return (
                         <button

@@ -171,6 +171,18 @@ function lastAiText(messages: BaseMessage[]): string {
     return "";
 }
 
+function mapMiniAgentFailure(e: unknown): Pick<MiniAgentResult, "reply" | "steps" | "stoppedReason" | "error"> {
+    const msg = e instanceof Error ? e.message : String(e);
+    const hitLimit =
+        /recursion/i.test(msg) || /GRAPH_RECURSION_LIMIT/i.test(msg) || /maximum/i.test(msg);
+    return {
+        reply: "",
+        steps: [],
+        stoppedReason: hitLimit ? "max_steps" : "error",
+        error: hitLimit ? undefined : msg,
+    };
+}
+
 /**
  * 单用户轮：由 createAgent 负责 tool_calls 循环；本函数只做入参、recursionLimit 与结果整理。
  */
@@ -188,9 +200,7 @@ export async function runMiniAgent(
     }
 
     const maxSteps = options?.maxSteps ?? MAX_STEPS_DEFAULT;
-    /** 模型一步 + 每工具一步，留余量；上限与原先手动循环接近 */
     const recursionLimit = Math.min(64, Math.max(6, maxSteps * 4 + 2));
-
     const model = createModel();
     const agent = createAgent({
         model,
@@ -200,30 +210,17 @@ export async function runMiniAgent(
 
     try {
         const result = (await agent.invoke(
-            {
-                messages: [{role: "user", content: userMessage}],
-            },
+            {messages: [{role: "user", content: userMessage}]},
             {recursionLimit}
         )) as {messages?: BaseMessage[]};
 
         const messages = result.messages ?? [];
-        const steps = buildStepsFromMessages(messages);
-        const reply = lastAiText(messages);
-
         return {
-            reply,
-            steps,
+            reply: lastAiText(messages),
+            steps: buildStepsFromMessages(messages),
             stoppedReason: "completed",
         };
     } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        const hitLimit =
-            /recursion/i.test(msg) || /GRAPH_RECURSION_LIMIT/i.test(msg) || /maximum/i.test(msg);
-        return {
-            reply: "",
-            steps: [],
-            stoppedReason: hitLimit ? "max_steps" : "error",
-            error: hitLimit ? undefined : msg,
-        };
+        return mapMiniAgentFailure(e);
     }
 }

@@ -30,7 +30,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
     req.user = { id: userId, email: decoded.email };
     return next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({ error: "token 无效或已过期" });
   }
 }

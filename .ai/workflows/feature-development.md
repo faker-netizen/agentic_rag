@@ -2,11 +2,12 @@
 
 ## 1. 澄清需求
 
+- 若尚未完成设计：先走 [需求分析与方案设计](./requirements-design.md)（`requirements-design` skill + `design-review` gate）
 - 阅读 [功能规划](../planning/FEATURE-PLAN.md)，确认模块与 backlog 编号（如有）
 - 解决什么用户问题？涉及哪些 apps/packages？
 - 不清楚时，先问再写代码。
 
-可选产出物：`.ai/templates/feature-brief.md`
+可选产出物：`.ai/templates/feature-brief.md`、`.ai/templates/solution-design.md`
 
 ## 2. 实现前门禁
 

@@ -4,7 +4,7 @@
  */
 export function decodeMultipartUtf8(name: string): string {
     if (!name) return name;
-    if (/[^\u0000-\u00ff]/.test(name)) {
+    if (hasNonLatin1Chars(name)) {
         return name;
     }
     try {
@@ -12,4 +12,11 @@ export function decodeMultipartUtf8(name: string): string {
     } catch {
         return name;
     }
+}
+
+function hasNonLatin1Chars(value: string): boolean {
+    for (let i = 0; i < value.length; i++) {
+        if (value.charCodeAt(i) > 0xff) return true;
+    }
+    return false;
 }

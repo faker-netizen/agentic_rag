@@ -1,0 +1,162 @@
+/** macOS Finder 风格知识库文档列表（嵌入桌面窗口） */
+
+.kb-finder {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.kb-finder--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kb-finder__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  flex-shrink: 0;
+}
+
+.kb-finder__toolbar-start {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.kb-finder__toolbar-icon {
+  font-size: 16px;
+  color: var(--color-accent);
+}
+
+.kb-finder__toolbar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.kb-finder__toolbar-count {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.kb-finder__upload {
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.kb-finder__alerts {
+  padding: 8px 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.kb-finder__alert-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.kb-finder__resume-input {
+  display: none;
+}
+
+.kb-finder__list-host {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.kb-finder__list {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 6px 8px 12px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.kb-finder__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  transition: background var(--motion-fast);
+}
+
+.kb-finder__row:hover {
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.kb-finder__row-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 245, 250, 0.95) 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  font-size: 18px;
+  color: #64748b;
+}
+
+.kb-finder__row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kb-finder__row-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kb-finder__row-meta {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.kb-finder__row-delete {
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+
+.kb-finder__row:hover .kb-finder__row-delete {
+  opacity: 1;
+}
+
+.kb-finder__loading,
+.kb-finder__error,
+.kb-finder__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

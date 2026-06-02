@@ -1,3 +1,5 @@
+import {SSE_DATA_PREFIX_LEN, SSE_EVENT_PREFIX_LEN} from "@/service/sseConstants.ts";
+
 export async function readSse(
     body: ReadableStream<Uint8Array>,
     onEvent: (event: string, dataJson: string) => void
@@ -16,8 +18,9 @@ export async function readSse(
             let eventName = "message";
             const dataLines: string[] = [];
             for (const line of raw.split("\n")) {
-                if (line.startsWith("event:")) eventName = line.slice(6).trim();
-                else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^\s/, ""));
+                if (line.startsWith("event:")) eventName = line.slice(SSE_EVENT_PREFIX_LEN).trim();
+                else if (line.startsWith("data:"))
+                    dataLines.push(line.slice(SSE_DATA_PREFIX_LEN).replace(/^\s/, ""));
             }
             const payload = dataLines.join("\n");
             if (payload) onEvent(eventName, payload);

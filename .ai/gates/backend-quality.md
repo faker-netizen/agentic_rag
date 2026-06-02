@@ -5,34 +5,28 @@
 ## 自动化（必须通过）
 
 ```bash
-pnpm -C apps/backend exec tsc --noEmit
+pnpm -C apps/backend lint          # ESLint guardrails + no-any + ban-ts-comment
+pnpm -C apps/backend exec tsc --noEmit   # lint-staged 对 backend 变更时
 pnpm build
 ```
 
-## 函数与 Service 结构
+## ESLint 硬门禁
 
-- [ ] **无超过 40 行的函数**（不含空行/注释），或已拆分且公开方法变短
-- [ ] 每个函数 **单一职责**（未在同一函数内混 SQL + RAG/外部 API + 多段业务分支）
-- [ ] Service **公开方法** 以编排为主，读起来像步骤列表
-- [ ] **无 copy-paste**：相同逻辑（history、sources、title 更新等）已抽取共享
-- [ ] 流式 / 非流式变体共享核心逻辑，仅 stream 层保留 SSE/迭代
+- **函数 ≤ 50 行**
+- **文件 ≤ 250 行**
+- **参数 ≤ 4**（多参数用 options 对象）
+- **每文件 1 个 class**
+- **魔法数字**：`src/services/**` → 使用 `serviceConstants.ts`
+- **`@typescript-eslint/no-explicit-any`**: error
+- **`ban-ts-comment`**: 禁止 `ts-ignore`
 
-## 快速自检（改 Service 时）
+## Service 清单
 
-1. 打开改动文件，扫一眼最长函数 — 超过一屏则拆
-2. 搜索相似代码块 — 出现 2 次即抽函数
-3. 公开方法能否用 5–7 个步骤名概括？不能则未拆够
+- [ ] 公开方法 = 编排，不含大段实现
+- [ ] 流式 / 非流式共享核心逻辑
+- [ ] 重复逻辑已抽取
 
-## 类型与安全
+## 相关
 
-- [ ] 禁止 `@ts-ignore`、禁止随意 `any`
-- [ ] 外部输入已校验；错误明确抛出或返回
-- [ ] 无密钥、token 写入代码或日志
-- [ ] API 新增/变更时已读 `.ai/gates/api-contract.md`
-
-## 与前端 gate 的关系
-
-- 仅 backend → 本 gate + `code-quality.md` 中的 build 项
-- 全栈功能 → 另过 `code-quality.md`（含 lint-staged）及适用的 `ui-quality.md`
-
-拆分指南：`.cursor/skills/backend-service/SKILL.md`
+- [code-quality.md](./code-quality.md)
+- `backend-service` skill

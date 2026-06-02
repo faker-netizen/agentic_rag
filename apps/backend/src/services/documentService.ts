@@ -4,6 +4,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import mammoth from 'mammoth';
 import ragService from './ragService.js';
+import {DOCUMENT_LIST_DEFAULT_LIMIT} from './serviceConstants.js';
+import {deleteStoredFile} from '../storage/localFileStorage.js';
 import type {ResultSetHeader} from 'mysql2';
 
 const require = createRequire(import.meta.url);
@@ -46,6 +48,17 @@ class DocumentService {
         return result.insertId;
     }
 
+    private async deleteDocumentRecord(
+        userId: number,
+        knowledgeBaseId: number,
+        documentId: number
+    ): Promise<void> {
+        await pool.query(
+            'DELETE FROM documents WHERE id = ? AND user_id = ? AND knowledge_base_id = ?',
+            [documentId, userId, knowledgeBaseId]
+        );
+    }
+
     async getDocumentScoped(
         documentId: number,
         userId: number,
@@ -85,6 +98,11 @@ class DocumentService {
             'DELETE FROM documents WHERE id = ? AND user_id = ? AND knowledge_base_id = ?',
             [documentId, userId, knowledgeBaseId]
         );
+
+        if (result.affectedRows > 0) {
+            await deleteStoredFile(doc.file_path);
+        }
+
         return result.affectedRows > 0;
     }
 
@@ -133,8 +151,6 @@ class DocumentService {
         throw new Error(`不支持的文件类型: ${ext}`);
     }
 
-
-
     async processAndSaveDocument(
         filePath: string,
         title: string,
@@ -146,30 +162,40 @@ class DocumentService {
             throw new Error('文件解析后内容为空，无法建立检索（请检查是否为扫描版 PDF 或空文档）');
         }
 
-        const documentId = await this.saveDocument({
-            user_id: userId,
-            knowledge_base_id: knowledgeBaseId,
-            title,
-            content,
-            file_path: filePath,
-            file_type: path.extname(filePath),
-        });
+        let documentId: number | null = null;
+        try {
+            documentId = await this.saveDocument({
+                user_id: userId,
+                knowledge_base_id: knowledgeBaseId,
+                title,
+                content,
+                file_path: filePath,
+                file_type: path.extname(filePath),
+            });
 
-        await ragService.ingestDocument({
-            text: content,
-            documentId,
-            title,
-            source: filePath,
-        });
+            await ragService.ingestDocument({
+                text: content,
+                documentId,
+                title,
+                source: filePath,
+            });
 
-        return documentId;
+            return documentId;
+        } catch (e) {
+            if (documentId != null) {
+                await ragService.deleteEmbeddingsForDocument(documentId);
+                await this.deleteDocumentRecord(userId, knowledgeBaseId, documentId);
+            }
+            await deleteStoredFile(filePath);
+            throw e;
+        }
     }
 
     async searchSimilarChunks(
         query: string,
         userId: number,
         knowledgeBaseId: number,
-        limit: number = 5
+        limit: number = DOCUMENT_LIST_DEFAULT_LIMIT
     ): Promise<DocumentChunk[]> {
         const relevantChunks = await ragService.retrieveRelevantChunks(query, {
             k: limit,

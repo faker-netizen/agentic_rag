@@ -1,10 +1,10 @@
 # 项目现状（新会话请先读此文件）
 
-> 最后更新：2026-05-31
+> 最后更新：2026-06-01
 
 ## 一句话
 
-**文档 AI 工作平台**（原 Design to Code 方向已调整）：RAG + 知识库 + 桌面壳已有；**当前产品核心**是「平台内文档 + 用户输入 → 业务域 Skill（Tool Call）→ 反馈」。
+**文档 AI 工作平台**：RAG + 知识库 + 桌面壳 + **知识库 Finder** 已有；**GitHub CI + Playwright E2E** 已接入。**产品核心**仍是「平台内文档 + 用户输入 → 业务域 Skill（Tool Call）→ 反馈」— **F-00 尚未开工**。
 
 ## 产品方向（必读）
 
@@ -22,6 +22,7 @@
 | [log/2026-05-macos-desktop-shell.md](./log/2026-05-macos-desktop-shell.md) | macOS 桌面壳 |
 | [log/2026-05-ai-harness.md](./log/2026-05-ai-harness.md) | 开发侧 AI harness |
 | [log/2026-05-product-pivot-doc-platform.md](./log/2026-05-product-pivot-doc-platform.md) | 产品方向 → 文档 AI 平台 |
+| [log/2026-06-ci-e2e-kb-finder.md](./log/2026-06-ci-e2e-kb-finder.md) | **KB Finder、Playwright E2E、GitHub CI、Backend ESLint** |
 
 ## 进行中
 
@@ -31,8 +32,8 @@
 
 - [ ] 对齐 F-00：Skill 注册表、Tool Call 层、文档 scope、域路由
 - [ ] 做 1～2 个示例业务域 Skill 原型（如通用文档问答）
-- [ ] 演进 `chat` 为 Skill 执行入口
-- [ ] 工程债：`chatService` refactor、harness commit、CI
+- [ ] 演进 `chat` 为 Skill 执行入口；`chatService` refactor
+- [ ] 工程债：前端 `max-lines-per-function` ≤80（大页面拆分后启用）
 
 ## 本地跑起来
 
@@ -40,6 +41,7 @@
 pnpm dev
 pnpm lint
 pnpm build
+pnpm test:e2e:smoke      # 需 e2e/.env + MySQL
 ```
 
 ## 关键路径速查
@@ -47,6 +49,8 @@ pnpm build
 | 区域 | 路径 |
 |------|------|
 | **功能规划** | `.ai/planning/FEATURE-PLAN.md` |
+| **CI** | `.github/workflows/ci.yml` |
+| **E2E** | `e2e/`、`e2e/README.md` |
 | RAG / 聊天 | `ragService.ts`、`chatService.ts` |
-| 文档 / KB | `documentService.ts`、`knowledgeBaseService.ts` |
+| 文档 / KB | `documentService.ts`、`KnowledgeBaseFinder.tsx` |
 | 桌面壳 | `apps/web/src/desktop/` |

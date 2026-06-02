@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+*.tsbuildinfo
 *.local
 
 # Editor directories and files
@@ -28,3 +29,12 @@ apps/backend/uploads
 .env.*
 **/.env
 **/.env.*
+!**/.env.example
+
+# Playwright
+/e2e/test-results/
+/e2e/playwright-report/
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/

@@ -19,7 +19,7 @@ const dbConfig = {
 
 // 创建连接池
 const pool = mysql.createPool(dbConfig);
-console.log(dbConfig)
+
 // 测试数据库连接
 export const testConnection = async (): Promise<boolean> => {
   try {
@@ -29,7 +29,7 @@ export const testConnection = async (): Promise<boolean> => {
     console.log('数据库连接成功');
     return true;
   } catch (error) {
-    console.error('数据库连接失败111:', error);
+    console.error('数据库连接失败:', error);
     return false;
   }
 };
@@ -84,158 +84,179 @@ async function migrateKnowledgeBaseSchema(connection: mysql.PoolConnection): Pro
   }
 }
 
+async function createUserAuthTables(connection: mysql.PoolConnection): Promise<void> {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      token_hash CHAR(64) NOT NULL,
+      jti CHAR(36) NOT NULL,
+      revoked_at TIMESTAMP NULL,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      replaced_by_token_hash CHAR(64) NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE KEY uniq_token_hash (token_hash),
+      KEY idx_user_id (user_id),
+      KEY idx_expires_at (expires_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+}
+
+async function createDocumentTables(connection: mysql.PoolConnection): Promise<void> {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS documents (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      content TEXT NOT NULL,
+      file_path VARCHAR(255),
+      file_type VARCHAR(50),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS embeddings (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      document_id INT NOT NULL,
+      chunk_text TEXT NOT NULL,
+      embedding JSON NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+}
+
+async function createChatTables(connection: mysql.PoolConnection): Promise<void> {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      knowledge_base_id INT NULL,
+      title VARCHAR(255) NOT NULL DEFAULT '新会话',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE SET NULL,
+      KEY idx_chat_sessions_user (user_id),
+      KEY idx_chat_sessions_updated (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      session_id INT NOT NULL,
+      role VARCHAR(20) NOT NULL,
+      content MEDIUMTEXT NOT NULL,
+      sources_json JSON NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE,
+      KEY idx_chat_messages_session (session_id, id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+}
+
+async function createUploadSessionsTable(connection: mysql.PoolConnection): Promise<void> {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS upload_sessions (
+      file_id CHAR(32) PRIMARY KEY,
+      user_id INT NOT NULL,
+      knowledge_base_id INT NOT NULL,
+      file_name VARCHAR(512) NOT NULL,
+      file_size BIGINT NOT NULL,
+      chunk_size INT NOT NULL,
+      total_chunks INT NOT NULL,
+      file_hash VARCHAR(128) NULL,
+      title VARCHAR(255) NULL,
+      status ENUM('uploading','merged','canceled') NOT NULL DEFAULT 'uploading',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE,
+      KEY idx_upload_sessions_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS upload_chunks (
+      file_id CHAR(32) NOT NULL,
+      chunk_index INT NOT NULL,
+      etag CHAR(32) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (file_id, chunk_index),
+      FOREIGN KEY (file_id) REFERENCES upload_sessions(file_id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+}
+
+async function createFileFingerprintsTable(connection: mysql.PoolConnection): Promise<void> {
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS file_fingerprints (
+      user_id INT NOT NULL,
+      knowledge_base_id INT NOT NULL,
+      file_hash VARCHAR(128) NOT NULL,
+      document_id INT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, knowledge_base_id, file_hash),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE,
+      FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+}
+
+async function createUploadTables(connection: mysql.PoolConnection): Promise<void> {
+  await createUploadSessionsTable(connection);
+  await createFileFingerprintsTable(connection);
+}
+
+async function createChatAndUploadTables(connection: mysql.PoolConnection): Promise<void> {
+  await createChatTables(connection);
+  await createUploadTables(connection);
+}
+
+async function seedAdminUser(connection: mysql.PoolConnection): Promise<void> {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminEmail || !adminPassword) return;
+
+  const [rows] = await connection.query(
+    'SELECT id FROM users WHERE email = ? LIMIT 1',
+    [adminEmail]
+  );
+  const existing = rows as Array<{ id: number }>;
+  if (existing.length) return;
+
+  const passwordHash = await bcrypt.hash(adminPassword, 10);
+  await connection.query(
+    'INSERT INTO users (email, password_hash) VALUES (?, ?)',
+    [adminEmail, passwordHash]
+  );
+  console.log(`已创建初始管理员账号: ${adminEmail}`);
+}
+
 // 初始化数据库表
 export const initializeTables = async (): Promise<void> => {
   try {
     const connection = await pool.getConnection();
 
-    // 创建用户表
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
-    // refresh token 表（存 hash + 轮换/撤销）
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS refresh_tokens (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        token_hash CHAR(64) NOT NULL,
-        jti CHAR(36) NOT NULL,
-        revoked_at TIMESTAMP NULL,
-        expires_at TIMESTAMP NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        replaced_by_token_hash CHAR(64) NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        UNIQUE KEY uniq_token_hash (token_hash),
-        KEY idx_user_id (user_id),
-        KEY idx_expires_at (expires_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
-    // 创建文档表
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS documents (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(255) NOT NULL,
-        content TEXT NOT NULL,
-        file_path VARCHAR(255),
-        file_type VARCHAR(50),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
-    // 创建向量表
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS embeddings (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        document_id INT NOT NULL,
-        chunk_text TEXT NOT NULL,
-        embedding JSON NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
+    await createUserAuthTables(connection);
+    await createDocumentTables(connection);
     await migrateKnowledgeBaseSchema(connection);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS chat_sessions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        knowledge_base_id INT NULL,
-        title VARCHAR(255) NOT NULL DEFAULT '新会话',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE SET NULL,
-        KEY idx_chat_sessions_user (user_id),
-        KEY idx_chat_sessions_updated (updated_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS upload_sessions (
-        file_id CHAR(32) PRIMARY KEY,
-        user_id INT NOT NULL,
-        knowledge_base_id INT NOT NULL,
-        file_name VARCHAR(512) NOT NULL,
-        file_size BIGINT NOT NULL,
-        chunk_size INT NOT NULL,
-        total_chunks INT NOT NULL,
-        file_hash VARCHAR(128) NULL,
-        title VARCHAR(255) NULL,
-        status ENUM('uploading','merged','canceled') NOT NULL DEFAULT 'uploading',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE,
-        KEY idx_upload_sessions_user (user_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS upload_chunks (
-        file_id CHAR(32) NOT NULL,
-        chunk_index INT NOT NULL,
-        etag CHAR(32) NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (file_id, chunk_index),
-        FOREIGN KEY (file_id) REFERENCES upload_sessions(file_id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS file_fingerprints (
-        user_id INT NOT NULL,
-        knowledge_base_id INT NOT NULL,
-        file_hash VARCHAR(128) NOT NULL,
-        document_id INT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (user_id, knowledge_base_id, file_hash),
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_bases(id) ON DELETE CASCADE,
-        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS chat_messages (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        session_id INT NOT NULL,
-        role VARCHAR(20) NOT NULL,
-        content MEDIUMTEXT NOT NULL,
-        sources_json JSON NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE,
-        KEY idx_chat_messages_session (session_id, id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
-    // 可选：初始化一个管理员账号（方便本地直接登录）
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (adminEmail && adminPassword) {
-      const [rows] = await connection.query(
-        'SELECT id FROM users WHERE email = ? LIMIT 1',
-        [adminEmail]
-      );
-      const existing = rows as Array<{ id: number }>;
-      if (!existing.length) {
-        const passwordHash = await bcrypt.hash(adminPassword, 10);
-        await connection.query(
-          'INSERT INTO users (email, password_hash) VALUES (?, ?)',
-          [adminEmail, passwordHash]
-        );
-        console.log(`已创建初始管理员账号: ${adminEmail}`);
-      }
-    }
+    await createChatAndUploadTables(connection);
+    await seedAdminUser(connection);
 
     connection.release();
     console.log('数据库表初始化成功');

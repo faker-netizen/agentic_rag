@@ -1,23 +1,53 @@
-import {FolderOutlined} from "@ant-design/icons";
-
-const PLACEHOLDER_ICONS = [
-    {id: "kb", label: "知识库", hint: "Finder 即将推出"},
-    {id: "docs", label: "文档", hint: "Finder 即将推出"},
-];
+import {FolderFilled} from "@ant-design/icons";
+import {Empty, Spin} from "antd";
+import {useDesktopKnowledgeBases} from "./desktopKnowledgeBaseContext.ts";
+import {useWindowManager} from "./useWindowManager.ts";
 
 export default function DesktopSurface() {
+    const {kbs, loading} = useDesktopKnowledgeBases();
+    const {openKnowledgeBase, isKnowledgeBaseOpen} = useWindowManager();
+
     return (
         <div className="desktop-surface">
-            <ul className="desktop-icons">
-                {PLACEHOLDER_ICONS.map((item) => (
-                    <li key={item.id} className="desktop-icon" title={item.hint}>
-                        <div className="desktop-icon__glyph">
-                            <FolderOutlined />
-                        </div>
-                        <span className="desktop-icon__label">{item.label}</span>
-                    </li>
-                ))}
-            </ul>
+            {loading && kbs.length === 0 ? (
+                <div className="desktop-surface__loading">
+                    <Spin />
+                </div>
+            ) : kbs.length === 0 ? (
+                <div className="desktop-surface__empty">
+                    <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description="暂无知识库，请从顶部菜单栏创建"
+                        className="desktop-surface__empty-inner"
+                    />
+                </div>
+            ) : (
+                <ul className="desktop-icons">
+                    {kbs.map((kb) => {
+                        const open = isKnowledgeBaseOpen(kb.id);
+                        return (
+                            <li key={kb.id}>
+                                <button
+                                    type="button"
+                                    className={[
+                                        "desktop-icon",
+                                        open && "desktop-icon--open",
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" ")}
+                                    onClick={() => openKnowledgeBase({id: kb.id, name: kb.name})}
+                                    title={kb.description ?? kb.name}
+                                >
+                                    <div className="desktop-icon__glyph">
+                                        <FolderFilled />
+                                    </div>
+                                    <span className="desktop-icon__label">{kb.name}</span>
+                                </button>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
         </div>
     );
 }

@@ -2,7 +2,7 @@ import express from "express";
 import multer from "multer";
 import knowledgeBaseService from "../services/knowledgeBaseService.js";
 import chunkUploadService from "../services/chunkUploadService.js";
-import {decodeMultipartUtf8} from "../utils/multipartUtf8.js";
+import {parseRouteParamId, requireUserId} from "../utils/routeHelpers.js";
 
 type KbUploadParams = {kbId: string; fileId?: string};
 
@@ -12,22 +12,6 @@ const chunkMem = multer({
     storage: multer.memoryStorage(),
     limits: {fileSize: 20 * 1024 * 1024},
 });
-
-function requireUserId(req: express.Request, res: express.Response): number | null {
-    const uid = req.user?.id;
-    if (uid == null || !Number.isFinite(uid)) {
-        res.status(401).json({error: "未登录"});
-        return null;
-    }
-    return uid;
-}
-
-function parseKbId(raw: string | string[] | undefined): number | null {
-    const s = Array.isArray(raw) ? raw[0] : raw;
-    if (s == null || typeof s !== "string") return null;
-    const n = Number(s);
-    return Number.isFinite(n) && n > 0 ? n : null;
-}
 
 async function assertKbOwned(userId: number, kbId: number): Promise<boolean> {
     const kb = await knowledgeBaseService.getOwned(userId, kbId);
@@ -39,7 +23,7 @@ router.post("/prepare", async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId((req.params as KbUploadParams).kbId);
+        const kbId = parseRouteParamId((req.params as KbUploadParams).kbId);
         if (kbId == null) return res.status(400).json({error: "无效的知识库 id"});
         if (!(await assertKbOwned(userId, kbId))) {
             return res.status(404).json({error: "知识库不存在"});
@@ -110,7 +94,7 @@ router.post("/chunk", chunkMem.single("chunk"), async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId((req.params as KbUploadParams).kbId);
+        const kbId = parseRouteParamId((req.params as KbUploadParams).kbId);
         if (kbId == null) return res.status(400).json({error: "无效的知识库 id"});
 
         const fileId = typeof req.body?.fileId === "string" ? req.body.fileId.trim() : "";
@@ -142,7 +126,7 @@ router.post("/merge", async (req, res) => {
     try {
         const userId = requireUserId(req, res);
         if (userId == null) return;
-        const kbId = parseKbId((req.params as KbUploadParams).kbId);
+        const kbId = parseRouteParamId((req.params as KbUploadParams).kbId);
         if (kbId == null) return res.status(400).json({error: "无效的知识库 id"});
 
         const fileId = typeof req.body?.fileId === "string" ? req.body.fileId.trim() : "";

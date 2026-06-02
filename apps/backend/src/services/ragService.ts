@@ -118,17 +118,33 @@ class RAGService {
                 }
             }
 
-            await Promise.all(
-                texts.map((text, i) =>
-                    pool.query(
-                        "INSERT INTO embeddings (document_id, chunk_text, embedding) VALUES (?, ?, ?)",
-                        [params.documentId, text, JSON.stringify(vectors[i])]
-                    )
-                )
-            );
+            await this.insertEmbeddingRows(params.documentId, texts, vectors);
         } catch (error) {
             console.error("[RAG] ingestDocument failed:", error);
             throw error;
+        }
+    }
+
+    private async insertEmbeddingRows(
+        documentId: number,
+        texts: string[],
+        vectors: number[][]
+    ): Promise<void> {
+        const conn = await pool.getConnection();
+        try {
+            await conn.beginTransaction();
+            for (let i = 0; i < texts.length; i++) {
+                await conn.query(
+                    "INSERT INTO embeddings (document_id, chunk_text, embedding) VALUES (?, ?, ?)",
+                    [documentId, texts[i], JSON.stringify(vectors[i])]
+                );
+            }
+            await conn.commit();
+        } catch (e) {
+            await conn.rollback();
+            throw e;
+        } finally {
+            conn.release();
         }
     }
 

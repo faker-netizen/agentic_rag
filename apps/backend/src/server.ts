@@ -62,11 +62,16 @@ app.use('/api/chat', requireAuth, chatRoutes);
 app.use('/api/agent', requireAuth, agentMinRoutes);
 
 // 错误处理中间件
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('服务器错误:', err);
-  res.status(err.status || 500).json({
-    error: err.message || '服务器内部错误',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  const status =
+    err && typeof err === 'object' && 'status' in err && typeof (err as {status: unknown}).status === 'number'
+      ? (err as {status: number}).status
+      : 500;
+  const message = err instanceof Error ? err.message : '服务器内部错误';
+  res.status(status).json({
+    error: message,
+    ...(process.env.NODE_ENV === 'development' && err instanceof Error && { stack: err.stack })
   });
 });
 

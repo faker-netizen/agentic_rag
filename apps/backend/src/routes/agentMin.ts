@@ -1,16 +1,8 @@
 import express from "express";
 import {runMiniAgent} from "../agent/minAgent.js";
+import {requireUserId} from "../utils/routeHelpers.js";
 
 const router = express.Router();
-
-function requireUserId(req: express.Request, res: express.Response): number | null {
-    const uid = req.user?.id;
-    if (uid == null || !Number.isFinite(uid)) {
-        res.status(401).json({error: "未登录"});
-        return null;
-    }
-    return uid;
-}
 
 /**
  * POST /api/agent/min  { message: string, maxSteps?: number }

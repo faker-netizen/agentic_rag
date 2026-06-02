@@ -19,7 +19,7 @@ const dbConfig = {
 
 // 创建连接池
 const pool = mysql.createPool(dbConfig);
-console.log(dbConfig)
+
 // 测试数据库连接
 export const testConnection = async (): Promise<boolean> => {
   try {
@@ -29,7 +29,7 @@ export const testConnection = async (): Promise<boolean> => {
     console.log('数据库连接成功');
     return true;
   } catch (error) {
-    console.error('数据库连接失败111:', error);
+    console.error('数据库连接失败:', error);
     return false;
   }
 };

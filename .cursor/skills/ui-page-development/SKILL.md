@@ -11,8 +11,8 @@ description: >-
 
 1. 阅读 `.ai/workflows/ui-page-development.md`
 2. 新建基础组件前，优先复用 `apps/web/src/components/shell/` 和 `apps/web/src/desktop/`
-3. 页内滚动 → `.cursor/rules/scrollable-layout.mdc` + `~/.cursor/skills/scrollable-layout/SKILL.md`
-4. 视觉风格 → `~/.cursor/skills/macbook-ui/SKILL.md`（个人 skill）+ `theme/tokens.css`
+3. 布局 CSS → `css-layout` skill；页内滚动 → `scrollable-layout` skill（或 `.cursor/rules/scrollable-layout.mdc`）
+4. 视觉风格 → `macbook-ui` skill + `theme/tokens.css`（**勿用**全局 `frontend-design`）
 5. 复杂页面 / 长组件 → `frontend-component` skill
 6. 通过 `.ai/gates/frontend-quality.md`、`.ai/gates/ui-quality.md` 和 `.ai/gates/code-quality.md`
 

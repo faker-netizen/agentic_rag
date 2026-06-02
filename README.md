@@ -100,6 +100,7 @@ pnpm exec lint-staged   # 模拟 pre-commit（web TS/TSX）
 | [.ai/progress/CURRENT.md](./.ai/progress/CURRENT.md) | 当前进度与下一步 |
 | [.ai/progress/README.md](./.ai/progress/README.md) | 进度存档说明 |
 | [.cursor/rules/ai-harness.mdc](./.cursor/rules/ai-harness.mdc) | Agent 任务路由 |
+| [.cursor/skills/requirements-design/SKILL.md](./.cursor/skills/requirements-design/SKILL.md) | 需求分析与方案设计（实现前） |
 | [.cursor/MCP.md](./.cursor/MCP.md) | MCP（Context7 / Playwright）配置与 Agent 约定 |
 
 ### Cursor MCP（可选）

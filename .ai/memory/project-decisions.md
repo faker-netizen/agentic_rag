@@ -34,6 +34,20 @@
 - **原因：** macOS 风格多窗口体验。
 - **参考：** `apps/web/src/router/index.tsx`、`apps/web/src/desktop/`
 
+## 2026-05 — 文件存储迁移阿里云 OSS
+
+- **决策：** 文档二进制由本地 `uploads/` 迁至 **阿里云 OSS**；通过 `StorageProvider` 抽象，开发环境可 `STORAGE_DRIVER=local`。
+- **原因：** 后端无状态、多实例一致；本地磁盘已清空，不适合继续作为生产方案。
+- **范围：** Phase 1 服务端中转上传 + OSS Multipart 对接现有分片 API；Phase 2 可选 STS 直传。
+- **参考：** `.ai/planning/oss-storage-design.md`
+
+## 2026-05 — 需求设计与实现分层
+
+- **决策：** 新增全局 skill `requirements-design`（需求分析 + 方案设计），与 `feature-development`（实现）分离；非 trivial 需求先过 `design-review` gate。
+- **原因：** 避免 Agent 未澄清即写代码；方案可评审、可存档，再进入实现。
+- **产出物：** `feature-brief`（小）、`solution-design`（中以上）、`implementation-plan`（待实现）。
+- **参考：** `.ai/workflows/requirements-design.md`、`.ai/gates/design-review.md`
+
 ## 2026-05 — Cursor MCP（Context7 + Playwright）
 
 - **决策：** 项目启用 **Context7**（库文档）与 **Playwright MCP**（浏览器验证）；配置在 `.cursor/mcp.json`，说明在 `.cursor/MCP.md`。

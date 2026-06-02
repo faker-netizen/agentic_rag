@@ -6,10 +6,10 @@ import {
 } from "react";
 import {getDockApp} from "./appRegistry.tsx";
 import {WindowManagerContext, type WindowManagerContextValue} from "./windowManagerContext.ts";
-import type {AppId, WindowInstance} from "./types.ts";
+import type {AppId, KnowledgeBaseWindowTarget, WindowInstance, WindowMeta} from "./types.ts";
 
 type WindowAction =
-    | {type: "OPEN"; appId: AppId}
+    | {type: "OPEN"; appId: AppId; meta?: WindowMeta; title?: string}
     | {type: "CLOSE"; id: string}
     | {type: "FOCUS"; id: string};
 
@@ -25,29 +25,48 @@ const initialState: WindowState = {
     focusedId: null,
 };
 
+function findExistingWindow(windows: WindowInstance[], appId: AppId, meta?: WindowMeta): WindowInstance | undefined {
+    if (appId === "kb-finder" && meta?.knowledgeBaseId != null) {
+        return windows.find(
+            (w) => w.appId === "kb-finder" && w.meta?.knowledgeBaseId === meta.knowledgeBaseId
+        );
+    }
+    return windows.find((w) => w.appId === appId);
+}
+
 function windowReducer(state: WindowState, action: WindowAction): WindowState {
     switch (action.type) {
         case "OPEN": {
-            const existing = state.windows.find((w) => w.appId === action.appId);
+            const existing = findExistingWindow(state.windows, action.appId, action.meta);
             if (existing) {
                 return {
                     ...state,
                     nextZIndex: state.nextZIndex + 1,
                     focusedId: existing.id,
                     windows: state.windows.map((w) =>
-                        w.id === existing.id ? {...w, zIndex: state.nextZIndex} : w
+                        w.id === existing.id
+                            ? {
+                                  ...w,
+                                  zIndex: state.nextZIndex,
+                                  title: action.title ?? w.title,
+                              }
+                            : w
                     ),
                 };
             }
             const def = getDockApp(action.appId);
             if (!def) return state;
-            const id = `${action.appId}-${Date.now()}`;
+            const id =
+                action.appId === "kb-finder" && action.meta?.knowledgeBaseId != null
+                    ? `kb-finder-${action.meta.knowledgeBaseId}`
+                    : `${action.appId}-${Date.now()}`;
             const win: WindowInstance = {
                 id,
                 appId: action.appId,
-                title: def.defaultTitle,
+                title: action.title ?? def.defaultTitle,
                 zIndex: state.nextZIndex,
                 rect: def.defaultSize ?? {width: 800, height: 560},
+                meta: action.meta,
             };
             return {
                 windows: [...state.windows, win],
@@ -83,6 +102,15 @@ export function WindowManagerProvider({children}: {children: ReactNode}) {
         dispatch({type: "OPEN", appId});
     }, []);
 
+    const openKnowledgeBase = useCallback((kb: KnowledgeBaseWindowTarget) => {
+        dispatch({
+            type: "OPEN",
+            appId: "kb-finder",
+            meta: {knowledgeBaseId: kb.id},
+            title: kb.name,
+        });
+    }, []);
+
     const closeWindow = useCallback((id: string) => {
         dispatch({type: "CLOSE", id});
     }, []);
@@ -96,16 +124,35 @@ export function WindowManagerProvider({children}: {children: ReactNode}) {
         [state.windows]
     );
 
+    const isKnowledgeBaseOpen = useCallback(
+        (kbId: number) =>
+            state.windows.some(
+                (w) => w.appId === "kb-finder" && w.meta?.knowledgeBaseId === kbId
+            ),
+        [state.windows]
+    );
+
     const value = useMemo(
-        () => ({
+        (): WindowManagerContextValue => ({
             windows: state.windows,
             focusedId: state.focusedId,
             openApp,
+            openKnowledgeBase,
             closeWindow,
             focusWindow,
             isAppOpen,
+            isKnowledgeBaseOpen,
         }),
-        [state.windows, state.focusedId, openApp, closeWindow, focusWindow, isAppOpen]
+        [
+            state.windows,
+            state.focusedId,
+            openApp,
+            openKnowledgeBase,
+            closeWindow,
+            focusWindow,
+            isAppOpen,
+            isKnowledgeBaseOpen,
+        ]
     );
 
     return <WindowManagerContext.Provider value={value}>{children}</WindowManagerContext.Provider>;

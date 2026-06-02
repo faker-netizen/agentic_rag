@@ -2,6 +2,7 @@ import {Suspense} from "react";
 import {Spin} from "antd";
 import {APP_COMPONENTS} from "./appRegistry.tsx";
 import {useWindowManager} from "./useWindowManager.ts";
+import {WindowContentContext} from "./windowContentContext.ts";
 import type {WindowInstance} from "./types.ts";
 
 type AppWindowProps = {
@@ -43,15 +44,17 @@ export default function AppWindow({window, stackIndex}: AppWindowProps) {
                 </header>
                 <div className="app-window__body">
                     {AppComponent ? (
-                        <Suspense
-                            fallback={
-                                <div className="app-window__loading">
-                                    <Spin />
-                                </div>
-                            }
-                        >
-                            <AppComponent />
-                        </Suspense>
+                        <WindowContentContext.Provider value={{meta: window.meta}}>
+                            <Suspense
+                                fallback={
+                                    <div className="app-window__loading">
+                                        <Spin />
+                                    </div>
+                                }
+                            >
+                                <AppComponent />
+                            </Suspense>
+                        </WindowContentContext.Provider>
                     ) : (
                         <div className="app-window__placeholder">即将推出</div>
                     )}

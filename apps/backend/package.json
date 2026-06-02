@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",

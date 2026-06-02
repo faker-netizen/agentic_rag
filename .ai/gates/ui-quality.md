@@ -24,6 +24,12 @@
 
 浏览器打开页面；调整视口大小；如有聊天/列表区域则测试滚动。
 
-参考：`.cursor/rules/scrollable-layout.mdc`
+**自动化 smoke（UI 主路径变更时推荐）：**
+
+```bash
+pnpm test:e2e:smoke
+```
+
+参考：[`e2e/README.md`](../../e2e/README.md)、`.cursor/rules/scrollable-layout.mdc`
 
 代码结构（函数长度、hook 拆分）：[frontend-quality.md](./frontend-quality.md)

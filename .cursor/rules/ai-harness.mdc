@@ -26,20 +26,22 @@ alwaysApply: true
 |----------|---------------|--------|-------|
 | **新会话 / 续作 / 进度** | — | `project-progress` | — |
 | **功能规划 / roadmap / 做什么** | `.ai/planning/FEATURE-PLAN.md` | — | — |
+| **需求分析 / 方案设计 / 技术方案** | `.ai/workflows/requirements-design.md` | `requirements-design` | `design-review` |
 | Git 提交 / 暂存变更 | — | `.cursor/skills/commit-workflow/` | `.ai/gates/code-quality.md` |
-| 新功能 / 需求 | `.ai/workflows/feature-development.md` | `feature-development` | `pre-implementation`、`code-quality` |
-| UI 页面 / 布局 / 桌面壳 | `.ai/workflows/ui-page-development.md` | `ui-page-development`、`frontend-component` | `frontend-quality`、`ui-quality`、`code-quality` |
+| 新功能 / 实现（方案已清） | `.ai/workflows/feature-development.md` | `feature-development` | `pre-implementation`、`code-quality` |
+| UI 页面 / 布局 / 桌面壳 | `.ai/workflows/ui-page-development.md` | `ui-page-development`、`css-layout`、`scrollable-layout`、`macbook-ui`、`frontend-component` | `frontend-quality`、`ui-quality`、`code-quality` |
 | 前端组件 / 页面逻辑拆分 | — | `frontend-component` | `frontend-quality` |
 | Bug 修复 | `.ai/workflows/bugfix.md` | — | `code-quality` |
 | 后端 Service / API | — | `backend-service` | `backend-quality`、`api-contract` |
 | Harness / 工作流设计 | — | `harness-engineering` | — |
 | 第三方库 API / 版本 / 文档 | — | **Context7 MCP** | — |
 | UI 验证 / 浏览器复现 / SSE 展示 | — | **Playwright MCP** | `ui-quality` |
+| **E2E 回归 / smoke 测试** | [`e2e/README.md`](../../e2e/README.md) | — | `ui-quality` |
 
 ## Agent 协议
 
 0. **续作** — 新会话或用户说「继续项目」：先读 `.ai/progress/CURRENT.md`；做新功能前读 `.ai/planning/FEATURE-PLAN.md` 对齐范围。
-1. **开始** — 匹配路由表；非 trivial 任务则阅读 workflow 及关联 skill。
+1. **开始** — 匹配路由表；**非 trivial 新需求先走 `requirements-design`**，方案确认后再 `feature-development`；其余任务阅读对应 workflow 及 skill。
 2. **实现** — 遵循所 touch 文件对应的 `.cursor/rules/*.mdc`；外部库 API 不确定时用 **Context7 MCP**（详见 `.cursor/MCP.md`）。
 3. **验证** — 跑 gates（lint、build）；前端/UI 改动可用 **Playwright MCP** 在本地 dev 上复验；宣称完成前阅读 `.ai/gates/`。
 4. **纠错** — hook/CI 失败时读 `.ai/memory/common-failures.md`；修复后重新验证。
@@ -51,7 +53,26 @@ alwaysApply: true
 - **pre-commit**：Husky → lint-staged → 对已暂存 `apps/web` / `packages/components` 的 TS/TSX 跑 ESLint
 - **User rules**：禁止 `ts-ignore`、禁止随意 `any`、组件必须 TypeScript、请求需处理 loading/error/empty
 
-## 个人 skill vs 项目 skill
+## 项目 Skills 清单（`.cursor/skills/`）
 
-- **项目**（`.cursor/skills/`）：本仓库团队共享的工作流
-- **个人**（`~/.cursor/skills/`）：如 `scrollable-layout`、`macbook-ui` — UI/布局 rule 指向时使用
+| Skill | 用途 |
+|-------|------|
+| `requirements-design` | 需求分析 / 方案设计 |
+| `feature-development` | 端到端功能实现（方案已清） |
+| `ui-page-development` | 页面 / 桌面壳工作流入口 |
+| `css-layout` | Flex 优先布局 |
+| `scrollable-layout` | 页内滚动 / 虚拟列表 |
+| `macbook-ui` | macOS 玻璃拟态视觉 |
+| `frontend-component` | 组件 / hook 拆分 |
+| `backend-service` | 后端 Service 编排 |
+| `commit-workflow` | Git 提交 + lint-staged |
+| `project-progress` | 进度存档 CURRENT / log |
+| `harness-engineering` | 维护 harness 本身 |
+
+## 全局 Skill 约定
+
+- **UI 视觉**：只用项目 `macbook-ui` + `tokens.css`。**勿用**全局 `frontend-design`（风格冲突）。
+- **LLM 集成**：本仓库 backend 用 OpenAI / LangChain。**勿用**全局 `claude-api`。
+- **E2E**：优先仓库 `pnpm test:e2e:*` 与 Playwright MCP，勿混用无关 artifact / 文档类 skill。
+- Cursor 内置 `~/.cursor/skills-cursor/` 与本项目无关时忽略（如 canvas、statusline、sdk）。
+- 原个人 skill `scrollable-layout`、`macbook-ui` 已迁入项目，勿再依赖 `~/.cursor/skills/` 副本。

@@ -11,19 +11,20 @@ description: >-
 
 1. 新会话续作：先读 `.ai/progress/CURRENT.md`
 2. 新功能：先读 `.ai/planning/FEATURE-PLAN.md` 对齐范围与优先级
-3. 阅读 `.ai/workflows/feature-development.md`
-4. 写代码前通过 `.ai/gates/pre-implementation.md`
-5. 范围较大时使用 `.ai/templates/feature-brief.md` 和 `.ai/templates/implementation-plan.md`
-6. 实现时遵循 `.cursor/rules/project.mdc` 及文件级 rules
-7. 提交前通过 `.ai/gates/code-quality.md`
-8. 提交时使用 `commit-workflow` skill
-9. 提交后使用 `project-progress` skill 写存档并更新 `CURRENT.md`
+3. **非 trivial 需求**：先完成 `requirements-design` skill 与 `design-review` gate，再进入本 skill
+4. 阅读 `.ai/workflows/feature-development.md`
+5. 写代码前通过 `.ai/gates/pre-implementation.md`
+6. 范围较大时使用 `.ai/templates/solution-design.md` 和 `.ai/templates/implementation-plan.md`
+7. 实现时遵循 `.cursor/rules/project.mdc` 及文件级 rules
+8. 提交前通过 `.ai/gates/code-quality.md`
+9. 提交时使用 `commit-workflow` skill
+10. 提交后使用 `project-progress` skill 写存档并更新 `CURRENT.md`
 
 ## 按层分工
 
 | 层级 | 路径 | 还需阅读 |
 |------|------|----------|
-| 前端 UI | `apps/web` | `frontend.mdc`；UI 为主用 `ui-page-development`；复杂组件用 `frontend-component`；gates：`frontend-quality`、`ui-quality` |
+| 前端 UI | `apps/web` | `frontend.mdc`；UI 用 `ui-page-development` + `css-layout` + `scrollable-layout` + `macbook-ui`；复杂组件用 `frontend-component`；gates：`frontend-quality`、`ui-quality` |
 | API | `apps/backend` | `backend.mdc`、`backend-service` skill、`.ai/gates/backend-quality.md`、`api-contract` |
 | 共享 UI | `packages/components` | `frontend.mdc` |
 

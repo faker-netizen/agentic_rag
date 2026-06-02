@@ -22,8 +22,8 @@ alwaysApply: false
 
 ## UI 与主题
 
-- 页内滚动：`.cursor/rules/scrollable-layout.mdc` + `~/.cursor/skills/scrollable-layout/SKILL.md`
-- macOS / 玻璃 UI：优先 `shell/`、`desktop/` 模式
+- 布局 CSS：`css-layout` skill；页内滚动：`scrollable-layout` skill（或 `scrollable-layout.mdc` rule）
+- macOS / 玻璃 UI：`macbook-ui` skill；优先复用 `shell/`、`desktop/`
 - 主题：`theme/tokens.css`、`antdTheme.ts`
 
 ## 拆分与完成前

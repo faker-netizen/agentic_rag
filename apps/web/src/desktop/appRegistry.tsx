@@ -2,6 +2,7 @@ import {lazy, type ComponentType, type LazyExoticComponent} from "react";
 import {FilePdfOutlined, MessageOutlined} from "@ant-design/icons";
 import type {AppId, DockAppDef} from "./types.ts";
 
+/** 仅出现在 Dock 中的应用 */
 export const DOCK_APPS: DockAppDef[] = [
     {
         id: "chat",
@@ -19,15 +20,28 @@ export const DOCK_APPS: DockAppDef[] = [
     },
 ];
 
-export const DOCK_ICONS: Record<AppId, ComponentType<{className?: string}>> = {
+/** 所有可开窗应用（含桌面知识库 Finder） */
+const WINDOW_APP_DEFS: DockAppDef[] = [
+    ...DOCK_APPS,
+    {
+        id: "kb-finder",
+        label: "知识库",
+        available: true,
+        defaultTitle: "知识库",
+        defaultSize: {width: 720, height: 520},
+    },
+];
+
+export const DOCK_ICONS: Partial<Record<AppId, ComponentType<{className?: string}>>> = {
     chat: MessageOutlined,
     chatpdf: FilePdfOutlined,
 };
 
 export const APP_COMPONENTS: Partial<Record<AppId, LazyExoticComponent<ComponentType>>> = {
     chat: lazy(() => import("@/pages/chat/index.tsx")),
+    "kb-finder": lazy(() => import("@/pages/knowledge-bases/KnowledgeBaseFinder.tsx")),
 };
 
 export function getDockApp(appId: AppId): DockAppDef | undefined {
-    return DOCK_APPS.find((a) => a.id === appId);
+    return WINDOW_APP_DEFS.find((a) => a.id === appId);
 }

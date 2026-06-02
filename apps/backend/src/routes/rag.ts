@@ -1,37 +1,18 @@
 import express from "express";
-import documentService from "../services/documentService.js";
 import ragService from "../services/ragService.js";
 import knowledgeBaseService from "../services/knowledgeBaseService.js";
+import {resolveSourcesFromChunks} from "../utils/ragSources.js";
+import {getUserId, parsePositiveInt} from "../utils/routeHelpers.js";
+import {isStreamAborted} from "../utils/streamAbort.js";
 import {bindRequestAbort, createSseWriter, setupSseResponse} from "../utils/sse.js";
 
 const router = express.Router();
 
-function parseId(raw: unknown): number | null {
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
-}
-
-type RagSource = {id: number; title: string};
-
-async function resolveSources(
-    chunks: Array<{metadata: {documentId: number}}>,
-    userId: number,
-    knowledgeBaseId: number
-): Promise<RagSource[]> {
-    const sourceIds = [...new Set(chunks.map((c) => c.metadata.documentId))];
-    const sources: RagSource[] = [];
-    for (const id of sourceIds) {
-        const doc = await documentService.getDocumentScoped(id, userId, knowledgeBaseId);
-        if (doc?.id != null) sources.push({id: doc.id, title: doc.title});
-    }
-    return sources;
-}
-
 /** POST /api/rag/query  { query, knowledgeBaseId } — SSE：sources|token|error|done */
 router.post("/query", async (req, res) => {
     try {
-        const userId = req.user?.id;
-        if (userId == null || !Number.isFinite(userId)) {
+        const userId = getUserId(req);
+        if (userId == null) {
             return res.status(401).json({error: "未登录"});
         }
 
@@ -40,7 +21,7 @@ router.post("/query", async (req, res) => {
             return res.status(400).json({error: "查询内容不能为空"});
         }
 
-        const knowledgeBaseId = parseId(kbRaw);
+        const knowledgeBaseId = parsePositiveInt(kbRaw);
         if (knowledgeBaseId == null) {
             return res.status(400).json({error: "knowledgeBaseId 无效"});
         }
@@ -55,7 +36,7 @@ router.post("/query", async (req, res) => {
         const sse = createSseWriter(res);
 
         let answer = "";
-        let sources: RagSource[] = [];
+        let sources: Awaited<ReturnType<typeof resolveSourcesFromChunks>> = [];
 
         try {
             for await (const part of ragService.answerWithRAGStream(query.trim(), {
@@ -67,7 +48,7 @@ router.post("/query", async (req, res) => {
                 if (part.type === "context") {
                     sources =
                         part.chunks.length > 0
-                            ? await resolveSources(part.chunks, userId, knowledgeBaseId)
+                            ? await resolveSourcesFromChunks(part.chunks, userId, knowledgeBaseId)
                             : [];
                     sse("sources", {sources});
                 } else if (part.type === "token") {
@@ -76,11 +57,7 @@ router.post("/query", async (req, res) => {
                 }
             }
         } catch (e) {
-            const aborted =
-                signal.aborted ||
-                (e instanceof Error &&
-                    (e.name === "AbortError" || (e as NodeJS.ErrnoException).code === "ABORT_ERR"));
-            if (aborted) {
+            if (isStreamAborted(e, signal)) {
                 sse("aborted", {stopped: true});
             } else {
                 const message = e instanceof Error ? e.message : "查询失败";

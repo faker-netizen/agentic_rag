@@ -1,7 +1,7 @@
 ---
 description: >-
-  Web 应用页内滚动区域须遵循 scrollable-layout skill（聊天面板、侧边栏、
-  虚拟列表、固定视口）。
+  Web 应用页内滚动区域须遵循 css-layout（flex 优先）与 scrollable-layout skill。
+  聊天面板、侧栏、虚拟列表、固定视口。
 globs: apps/web/**/*.{tsx,css}
 alwaysApply: false
 ---
@@ -10,14 +10,15 @@ alwaysApply: false
 
 实现**页内滚动**（非整页 document 滚动）时——包括聊天消息区、侧边栏、主从列表、固定壳内的表格或虚拟列表——**在写布局 CSS/结构之前**：
 
-1. 阅读 `~/.cursor/skills/scrollable-layout/SKILL.md`
-2. 应用其中模式：
-   - **Grid** 划分 header / 滚动 body / footer：`grid-template-rows: auto minmax(0, 1fr) auto`
-   - 嵌在 antd Layout、Spin 或 glass shell 内时使用 **ScrollHost + ScrollArea**（`position: relative` + `absolute; inset: 0; overflow-y: auto`）
+1. 阅读 `.cursor/skills/css-layout/SKILL.md`（**flex 优先**，grid 仅二维或 DOM 稳定时）
+2. 阅读 `.cursor/skills/scrollable-layout/SKILL.md`（滚动层、虚拟列表、Spin overlay）
+3. 应用模式：
+   - **默认 flex 列**：header `flex-shrink:0` + body `flex:1; min-height:0`
+   - 嵌套 antd Layout、Spin 或 glass shell 时用 **ScrollHost + ScrollArea**（`absolute; inset:0; overflow-y:auto`）
    - 每个滚动轴仅 **一个** `overflow-y: auto` 负责元素
-3. **不要**用 `<Spin>` 包裹滚动内容——改用 overlay loader
-4. **避免**用 flex 子项 `height: 100%` 作为滚动修复的主要手段
+4. **不要**用 `<Spin>` 包裹滚动内容——改用 overlay loader
+5. **避免**用 flex 子项 `height: 100%` 作为滚动修复的主要手段
 
-参考：`apps/web/src/pages/chat/chat.css`
+参考：`apps/web/src/pages/knowledge-bases/finder.css`、`apps/web/src/pages/chat/chat.css`
 
 实现后在 DevTools 验证：滚动元素 `clientHeight > 0`；内容溢出时 `clientHeight < scrollHeight`。

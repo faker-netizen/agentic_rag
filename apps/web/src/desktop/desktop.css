@@ -58,6 +58,22 @@
   background: rgba(255, 255, 255, 0.12) !important;
 }
 
+.desktop-menubar__menu {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.desktop-menubar__menu-item {
+  color: rgba(255, 255, 255, 0.92) !important;
+  font-size: 13px;
+  border-radius: 6px;
+}
+
+.desktop-menubar__menu-item:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
 /* Desktop surface + icons */
 .desktop-surface {
   position: absolute;
@@ -65,6 +81,19 @@
   z-index: 1;
   padding: 24px;
   pointer-events: none;
+}
+
+.desktop-surface__loading,
+.desktop-surface__empty {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-height: 120px;
+}
+
+.desktop-surface__empty-inner .ant-empty-description {
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .desktop-icons {
@@ -87,20 +116,30 @@
   gap: 6px;
   width: 88px;
   padding: 8px 4px;
+  border: none;
   border-radius: var(--radius-sm);
-  cursor: default;
-  opacity: 0.85;
-  transition: background var(--motion-fast);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.92;
+  transition: background var(--motion-fast), transform var(--motion-fast);
 }
 
 .desktop-icon:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.desktop-icon:active {
+  transform: scale(0.96);
+}
+
+.desktop-icon--open {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .desktop-icon__glyph {
-  font-size: 40px;
-  color: rgba(255, 255, 255, 0.95);
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+  font-size: 44px;
+  color: #fcd34d;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.35));
 }
 
 .desktop-icon__label {

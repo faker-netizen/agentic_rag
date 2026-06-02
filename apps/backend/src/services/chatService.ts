@@ -8,6 +8,7 @@ import {
     maybeRefreshSessionTitle,
     streamAssistantReply,
 } from "./chatStreamHelpers.js";
+import {MAX_CHAT_TITLE_LENGTH} from "./serviceConstants.js";
 
 export type ChatSessionRow = {
     id: number;
@@ -44,7 +45,7 @@ class ChatService {
         }
         const title =
             typeof params.title === "string" && params.title.trim()
-                ? params.title.trim().slice(0, 255)
+                ? params.title.trim().slice(0, MAX_CHAT_TITLE_LENGTH)
                 : DEFAULT_TITLE;
         const [r] = await pool.query<ResultSetHeader>(
             "INSERT INTO chat_sessions (user_id, knowledge_base_id, title) VALUES (?, ?, ?)",
@@ -77,7 +78,7 @@ class ChatService {
     }
 
     async updateSessionTitle(userId: number, sessionId: number, title: string): Promise<boolean> {
-        const t = title.trim().slice(0, 255);
+        const t = title.trim().slice(0, MAX_CHAT_TITLE_LENGTH);
         if (!t) return false;
         const [r] = await pool.query<ResultSetHeader>(
             `UPDATE chat_sessions
@@ -114,13 +115,14 @@ class ChatService {
      * SSE 发送：先落库用户消息，推送 token；结束时落库助手消息。
      * 事件：meta → sources（可选）→ token（多次）→ done；失败时 error（仍落库失败文案）。
      */
-    async appendMessage(
-        userId: number,
-        session: ChatSessionRow,
-        content: string,
-        sse: (event: string, data: Record<string, unknown>) => void,
-        signal?: AbortSignal
-    ): Promise<void> {
+    async appendMessage(params: {
+        userId: number;
+        session: ChatSessionRow;
+        content: string;
+        sse: (event: string, data: Record<string, unknown>) => void;
+        signal?: AbortSignal;
+    }): Promise<void> {
+        const {userId, session, content, sse, signal} = params;
         const text = content.trim();
         if (!text) throw new Error("消息内容不能为空");
 
@@ -128,14 +130,14 @@ class ChatService {
         const userMessageId = await insertUserMessage(session.id, text);
         sse("meta", {userMessageId});
 
-        const {answer, sources, aborted} = await streamAssistantReply(
+        const {answer, sources, aborted} = await streamAssistantReply({
             userId,
             session,
             text,
             history,
             sse,
-            signal
-        );
+            signal,
+        });
 
         if (aborted) {
             sse("aborted", {stopped: true});

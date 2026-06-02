@@ -50,9 +50,17 @@ alwaysApply: true
 
 ## 硬门禁（不可跳过）
 
-- **GitHub Actions**（`.github/workflows/ci.yml`）：`pnpm lint` → `pnpm build` → `pnpm test:e2e:smoke`（MySQL service + Playwright）
+- **GitHub Actions**（`.github/workflows/ci.yml`）：`pnpm lint` → `pnpm build` → `pnpm test:e2e:smoke`
 - **pre-commit**：Husky → lint-staged → web/components ESLint；backend ESLint + `tsc`
+- **ESLint AI Guardrails**（`eslint.ai-guardrails.mjs`，`--max-warnings=0`）：
+
+| 范围 | 函数行数 | 文件行数 | 参数 | 类/文件 | 魔法数字 |
+|------|----------|----------|------|---------|----------|
+| `apps/backend` | ≤50 | ≤250 | ≤4 | 1 class | `src/services/**` |
+| `apps/web` + `packages/components` | ≤80 | ≤250 | ≤4 | 1 class | `src/service/**` |
+
 - **User rules**：禁止 `ts-ignore`、禁止随意 `any`、组件必须 TypeScript、请求需处理 loading/error/empty
+- **Agent 不得自行放宽** ESLint guardrails 配置；需用户确认
 
 ## 项目 Skills 清单（`.cursor/skills/`）
 

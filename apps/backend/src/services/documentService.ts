@@ -4,6 +4,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import mammoth from 'mammoth';
 import ragService from './ragService.js';
+import {DOCUMENT_LIST_DEFAULT_LIMIT} from './serviceConstants.js';
 import {deleteStoredFile} from '../storage/localFileStorage.js';
 import type {ResultSetHeader} from 'mysql2';
 
@@ -194,7 +195,7 @@ class DocumentService {
         query: string,
         userId: number,
         knowledgeBaseId: number,
-        limit: number = 5
+        limit: number = DOCUMENT_LIST_DEFAULT_LIMIT
     ): Promise<DocumentChunk[]> {
         const relevantChunks = await ragService.retrieveRelevantChunks(query, {
             k: limit,

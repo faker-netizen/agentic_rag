@@ -1,132 +1,47 @@
 import {RecursiveCharacterTextSplitter} from "@langchain/textsplitters";
-import {ChatOpenAI} from "@langchain/openai";
 import VectorIndex from "../config/vectorIndex.js";
 import {Document} from "@langchain/core/documents";
-import {qwenConfig} from "../config/qwen.js";
 import pool from "../config/database.js";
 import {HumanMessage, AIMessage, SystemMessage, AIMessageChunk} from "@langchain/core/messages";
 import {invokeRagRetrievalGraph} from "../ragAgent/ragRetrievalGraph.js";
-import {truncateChatContent, type ChatTurn} from "../utils/chatHistory.js";
+import {truncateChatContent} from "../utils/chatHistory.js";
+import {
+    INGEST_CHUNK_OVERLAP,
+    INGEST_CHUNK_SIZE,
+    RAG_CONTEXT_MAX_CHARS,
+    SCORE_DECIMAL_PLACES,
+} from "./serviceConstants.js";
+import {
+    buildEmbeddingScopeFilter,
+    buildRagGenerationMessages,
+    createLLM,
+    defaultMinScore,
+    defaultRetrievalK,
+    embeddingCandidateLimit,
+    messageChunkToText,
+    scoreEmbeddingCandidates,
+    validateEmbeddingBatch,
+    type RagChatHistory,
+} from "./ragServiceHelpers.js";
 
 export type RagChunkItem = {
     content: string;
     score: number;
     metadata: {documentId: number; embeddingId: number};
 };
+
+export type RagStreamPart =
+    | {type: "context"; chunks: RagChunkItem[]}
+    | {type: "token"; text: string};
+
+export type {RagChatHistory} from "./ragServiceHelpers.js";
+
 type EmbeddingRow = {
     id: number;
     document_id: number;
     chunk_text: string;
     embedding: number[];
 };
-
-/** 流式：先下发检索到的片段（用于引用），再逐 token 输出模型文本 */
-export type RagStreamPart =
-    | {type: "context"; chunks: RagChunkItem[]}
-    | {type: "token"; text: string};
-
-function messageChunkToText(chunk: AIMessageChunk): string {
-    const c = chunk.content;
-    if (typeof c === "string") return c;
-    if (Array.isArray(c)) {
-        return c
-            .map((block) => {
-                if (typeof block === "string") return block;
-                if (block && typeof block === "object" && "text" in block) {
-                    return String((block as {text?: string}).text ?? "");
-                }
-                return "";
-            })
-            .join("");
-    }
-    return "";
-}
-
-function createLLM() {
-    return new ChatOpenAI({
-        apiKey: qwenConfig.apiKey,
-        configuration: {baseURL: qwenConfig.baseURL},
-        model: qwenConfig.chatModel,
-        temperature: Number.isFinite(qwenConfig.temperature) ? qwenConfig.temperature : 0.2,
-    });
-}
-
-export type RagChatHistory = ChatTurn[];
-
-function buildRagGenerationMessages(
-    query: string,
-    context: string,
-    history: RagChatHistory
-): (SystemMessage | HumanMessage | AIMessage)[] {
-    const msgs: (SystemMessage | HumanMessage | AIMessage)[] = [
-        new SystemMessage(
-            "你是专业文档问答助手。主要依据【参考上下文】回答【当前问题】。\n" +
-                "若用户为追问、对比或指代，可结合【对话历史】理解意图；技术细节须来自参考上下文或历史中助手已给出的、与文档一致的内容，不要编造。\n" +
-                "若参考上下文与历史仍不足以回答，明确说明信息不足。"
-        ),
-    ];
-    for (const h of history) {
-        if (h.role === "user") msgs.push(new HumanMessage(h.content));
-        else msgs.push(new AIMessage(truncateChatContent(h.content, 2000)));
-    }
-    msgs.push(
-        new HumanMessage(`【参考上下文】\n${context}\n\n【当前问题】\n${query}`)
-    );
-    return msgs;
-}
-
-function validateEmbeddingBatch(texts: string[], vectors: number[][]): void {
-    if (vectors.length !== texts.length) {
-        throw new Error(`embed result mismatch: texts=${texts.length}, vectors=${vectors.length}`);
-    }
-    const dim = vectors[0]?.length ?? 0;
-    if (!dim) throw new Error("empty embedding vector");
-    for (const v of vectors) {
-        if (!Array.isArray(v) || v.length !== dim) {
-            throw new Error("invalid embedding dimension");
-        }
-    }
-}
-
-function scoreEmbeddingCandidates(
-    candidates: EmbeddingRow[],
-    queryVec: number[],
-    minScore: number,
-    k: number
-): RagChunkItem[] {
-    const scored: RagChunkItem[] = [];
-    for (const row of candidates) {
-        const vec = row.embedding;
-        if (!Array.isArray(vec) || vec.length !== queryVec.length) continue;
-        const score = VectorIndex.cosineSimilarity(queryVec, vec);
-        if (!Number.isFinite(score) || score < minScore) continue;
-        scored.push({
-            content: row.chunk_text,
-            metadata: {documentId: row.document_id, embeddingId: row.id},
-            score,
-        });
-    }
-    scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, k);
-}
-
-function buildEmbeddingScopeFilter(opts?: {
-    documentId?: number;
-    knowledgeBaseId?: number;
-    userId?: number;
-}): {parts: string[]; args: unknown[]} {
-    const args: unknown[] = [opts?.userId];
-    const parts = ["d.user_id = ?"];
-    if (opts?.knowledgeBaseId != null) {
-        parts.push("d.knowledge_base_id = ?");
-        args.push(opts.knowledgeBaseId);
-    }
-    if (opts?.documentId) {
-        parts.push("e.document_id = ?");
-        args.push(opts.documentId);
-    }
-    return {parts, args};
-}
 
 class RAGService {
     async ingestDocument(params: {
@@ -137,8 +52,8 @@ class RAGService {
     }): Promise<void> {
         try {
             const splitter = new RecursiveCharacterTextSplitter({
-                chunkSize: 300,
-                chunkOverlap: 100,
+                chunkSize: INGEST_CHUNK_SIZE,
+                chunkOverlap: INGEST_CHUNK_OVERLAP,
             });
 
             const docs = await splitter.splitDocuments([
@@ -202,12 +117,10 @@ class RAGService {
         }
     ): Promise<RagChunkItem[]> {
         try {
-            const k = opts?.k ?? 5;
-            const minScore = opts?.minScore ?? 0.2;
+            const k = defaultRetrievalK(opts?.k);
+            const minScore = defaultMinScore(opts?.minScore);
 
-            if (opts?.userId == null) {
-                return [];
-            }
+            if (opts?.userId == null) return [];
 
             const [queryVec] = await VectorIndex.embedTexts([query]);
             if (!queryVec || !queryVec.length) return [];
@@ -218,7 +131,7 @@ class RAGService {
                 FROM embeddings e
                 INNER JOIN documents d ON d.id = e.document_id
                 WHERE ${parts.join(" AND ")}
-                ORDER BY e.id DESC LIMIT 2000
+                ORDER BY e.id DESC LIMIT ${embeddingCandidateLimit()}
             `;
 
             const [rows] = await pool.query(sql, args);
@@ -236,9 +149,6 @@ class RAGService {
         return !state.chunks.length || !state.evalResult?.sufficient;
     }
 
-    /**
-     * RAG 问答（仅 SSE 流式）。先 context 片段，再 token。
-     */
     async *answerWithRAGStream(
         query: string,
         opts?: {
@@ -248,7 +158,6 @@ class RAGService {
             k?: number;
             minScore?: number;
             history?: RagChatHistory;
-            /** 中止时 LangChain / 底层 HTTP 会取消流式请求 */
             signal?: AbortSignal;
         }
     ): AsyncGenerator<RagStreamPart> {
@@ -265,8 +174,8 @@ class RAGService {
                 userId: opts.userId,
                 knowledgeBaseId: opts.knowledgeBaseId,
                 documentId: opts.documentId,
-                k: opts.k ?? 5,
-                minScore: opts.minScore,
+                k: defaultRetrievalK(opts?.k),
+                minScore: opts?.minScore,
                 signal: opts?.signal,
             },
         });
@@ -300,7 +209,7 @@ class RAGService {
     ): AsyncGenerator<RagStreamPart> {
         const llm = createLLM();
         const context = chunks
-            .map((c, i) => `片段${i + 1}(score=${c.score.toFixed(3)}):\n${c.content}`)
+            .map((c, i) => `片段${i + 1}(score=${c.score.toFixed(SCORE_DECIMAL_PLACES)}):\n${c.content}`)
             .join("\n\n");
         const messages = buildRagGenerationMessages(query, context, history);
 
@@ -316,7 +225,6 @@ class RAGService {
         }
     }
 
-    /** 无知识库或多轮纯对话（流式）；ragFallback 表示检索未命中后的兜底 */
     async *streamChatPlain(
         userMessage: string,
         history: Array<{role: "user" | "assistant"; content: string}>,
@@ -331,7 +239,7 @@ class RAGService {
         const msgs: (SystemMessage | HumanMessage | AIMessage)[] = [new SystemMessage(systemText)];
         for (const h of history) {
             if (h.role === "user") msgs.push(new HumanMessage(h.content));
-            else msgs.push(new AIMessage(truncateChatContent(h.content, 2000)));
+            else msgs.push(new AIMessage(truncateChatContent(h.content, RAG_CONTEXT_MAX_CHARS)));
         }
         msgs.push(new HumanMessage(userMessage));
         try {

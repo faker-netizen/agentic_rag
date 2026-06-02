@@ -135,7 +135,7 @@ router.post("/sessions/:sessionId/messages", async (req, res) => {
         const sse = createSseWriter(res);
 
         try {
-            await chatService.appendMessage(userId, session, content, sse, signal);
+            await chatService.appendMessage({userId, session, content, sse, signal});
         } catch (e) {
             const message = e instanceof Error ? e.message : "发送失败";
             sse("error", {message});

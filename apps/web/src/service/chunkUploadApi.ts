@@ -50,98 +50,109 @@ function errMessage(e: unknown): string {
     return e instanceof Error ? e.message : "请求失败";
 }
 
+function authHeaders(): Record<string, string> {
+    const token = getAccessToken();
+    return token ? {Authorization: `Bearer ${token}`} : {};
+}
+
+type ChunkApiContext = {
+    base: string;
+    bizTitle?: string;
+};
+
+async function prepareUpload(
+    ctx: ChunkApiContext,
+    params: Parameters<UploadApi["prepare"]>[0]
+) {
+    return withAuthRetry(async () => {
+        const res = await axios.post<PrepareRes>(
+            `${ctx.base}/prepare`,
+            {
+                fileName: params.fileName,
+                fileSize: params.fileSize,
+                chunkSize: params.chunkSize,
+                totalChunks: params.totalChunks,
+                fileHash: params.fileHash,
+                fileId: params.fileId,
+                title: (params.biz?.title as string) || ctx.bizTitle,
+            },
+            {withCredentials: true, timeout: 60_000, headers: authHeaders()}
+        );
+        const d = res.data;
+        return {
+            fileId: d.fileId,
+            uploadedChunkIndexes: d.uploadedChunkIndexes ?? [],
+            instant: d.instant,
+            documentId: d.documentId,
+        };
+    });
+}
+
+async function uploadChunk(ctx: ChunkApiContext, params: Parameters<UploadApi["uploadChunk"]>[0]) {
+    return withAuthRetry(async () => {
+        const form = new FormData();
+        form.append("chunk", params.chunk, `${params.fileName}.part${params.chunkIndex}`);
+        form.append("fileId", params.fileId);
+        form.append("chunkIndex", String(params.chunkIndex));
+
+        const res = await axios.post<{success: boolean; etag?: string}>(`${ctx.base}/chunk`, form, {
+            withCredentials: true,
+            timeout: 180_000,
+            signal: params.signal,
+            headers: authHeaders(),
+            onUploadProgress: (ev) => {
+                const total = ev.total ?? params.chunk.size;
+                const loaded = ev.loaded ?? 0;
+                params.onUploadProgress?.(loaded, total);
+            },
+        });
+        return {etag: res.data.etag};
+    }).catch((e) => {
+        throw new Error(errMessage(e));
+    });
+}
+
+async function mergeChunks(ctx: ChunkApiContext, params: Parameters<UploadApi["merge"]>[0]) {
+    return withAuthRetry(async () => {
+        const res = await axios.post<MergeRes>(
+            `${ctx.base}/merge`,
+            {fileId: params.fileId},
+            {withCredentials: true, timeout: 600_000, headers: authHeaders()}
+        );
+        return {
+            fileId: res.data.fileId,
+            documentId: res.data.documentId,
+            fileUrl: res.data.fileUrl,
+        };
+    }).catch((e) => {
+        throw new Error(errMessage(e));
+    });
+}
+
+async function cancelUpload(
+    ctx: ChunkApiContext,
+    params: {fileId: string; biz?: Record<string, unknown>}
+) {
+    await withAuthRetry(async () => {
+        await axios.delete(`${ctx.base}/${params.fileId}`, {
+            withCredentials: true,
+            headers: authHeaders(),
+        });
+    }).catch(() => undefined);
+}
+
 /** 知识库大文件分片上传 API，供 ChunkedUploadSDK 使用 */
 export function createKnowledgeBaseChunkUploadApi(kbId: number, title?: string): UploadApi {
-    const base = `${apiBase()}/api/knowledge-bases/${kbId}/uploads`;
-    const biz = {knowledgeBaseId: kbId, title: title?.trim() || undefined};
+    const ctx: ChunkApiContext = {
+        base: `${apiBase()}/api/knowledge-bases/${kbId}/uploads`,
+        bizTitle: title?.trim() || undefined,
+    };
 
     return {
-        async prepare(params) {
-            return withAuthRetry(async () => {
-                const token = getAccessToken();
-                const res = await axios.post<PrepareRes>(
-                    `${base}/prepare`,
-                    {
-                        fileName: params.fileName,
-                        fileSize: params.fileSize,
-                        chunkSize: params.chunkSize,
-                        totalChunks: params.totalChunks,
-                        fileHash: params.fileHash,
-                        fileId: params.fileId,
-                        title: (params.biz?.title as string) || biz.title,
-                    },
-                    {
-                        withCredentials: true,
-                        timeout: 60_000,
-                        headers: token ? {Authorization: `Bearer ${token}`} : {},
-                    }
-                );
-                const d = res.data;
-                return {
-                    fileId: d.fileId,
-                    uploadedChunkIndexes: d.uploadedChunkIndexes ?? [],
-                    instant: d.instant,
-                    documentId: d.documentId,
-                };
-            });
-        },
-
-        async uploadChunk(params) {
-            return withAuthRetry(async () => {
-                const form = new FormData();
-                form.append("chunk", params.chunk, `${params.fileName}.part${params.chunkIndex}`);
-                form.append("fileId", params.fileId);
-                form.append("chunkIndex", String(params.chunkIndex));
-
-                const token = getAccessToken();
-                const res = await axios.post<{success: boolean; etag?: string}>(`${base}/chunk`, form, {
-                    withCredentials: true,
-                    timeout: 180_000,
-                    signal: params.signal,
-                    headers: token ? {Authorization: `Bearer ${token}`} : {},
-                    onUploadProgress: (ev) => {
-                        const total = ev.total ?? params.chunk.size;
-                        const loaded = ev.loaded ?? 0;
-                        params.onUploadProgress?.(loaded, total);
-                    },
-                });
-                return {etag: res.data.etag};
-            }).catch((e) => {
-                throw new Error(errMessage(e));
-            });
-        },
-
-        async merge(params) {
-            return withAuthRetry(async () => {
-                const token = getAccessToken();
-                const res = await axios.post<MergeRes>(
-                    `${base}/merge`,
-                    {fileId: params.fileId},
-                    {
-                        withCredentials: true,
-                        timeout: 600_000,
-                        headers: token ? {Authorization: `Bearer ${token}`} : {},
-                    }
-                );
-                return {
-                    fileId: res.data.fileId,
-                    documentId: res.data.documentId,
-                    fileUrl: res.data.fileUrl,
-                };
-            }).catch((e) => {
-                throw new Error(errMessage(e));
-            });
-        },
-
-        async cancel(params) {
-            await withAuthRetry(async () => {
-                const token = getAccessToken();
-                await axios.delete(`${base}/${params.fileId}`, {
-                    withCredentials: true,
-                    headers: token ? {Authorization: `Bearer ${token}`} : {},
-                });
-            }).catch(() => undefined);
-        },
+        prepare: (params) => prepareUpload(ctx, params),
+        uploadChunk: (params) => uploadChunk(ctx, params),
+        merge: (params) => mergeChunks(ctx, params),
+        cancel: (params) => cancelUpload(ctx, params),
     };
 }
 
@@ -153,10 +164,9 @@ export async function fetchChunkUploadStatus(
     const base = `${apiBase()}/api/knowledge-bases/${kbId}/uploads`;
     try {
         return await withAuthRetry(async () => {
-            const token = getAccessToken();
             const res = await axios.get<ChunkUploadStatusRes>(`${base}/${fileId}/status`, {
                 withCredentials: true,
-                headers: token ? {Authorization: `Bearer ${token}`} : {},
+                headers: authHeaders(),
             });
             return res.data;
         });

@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
+import {backendGuardrails, backendServiceMagicNumbers} from '../../eslint.ai-guardrails.mjs';
 
 export default tseslint.config(
     {ignores: ['dist/**', 'src/config/test.js']},
@@ -23,10 +24,11 @@ export default tseslint.config(
                 'error',
                 {'ts-expect-error': 'allow-with-description', 'ts-ignore': true},
             ],
-            'max-lines-per-function': [
-                'error',
-                {max: 40, skipBlankLines: true, skipComments: true, IIFEs: true},
-            ],
+            ...backendGuardrails,
         },
-    }
+    },
+    {
+        files: ['src/services/**/*.ts'],
+        rules: backendServiceMagicNumbers,
+    },
 );

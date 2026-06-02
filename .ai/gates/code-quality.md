@@ -5,48 +5,45 @@
 ## 自动化检查（必须通过）
 
 ```bash
-# 模拟 pre-commit 对已暂存 web TS/TSX 的检查
-pnpm exec lint-staged
-
-# CI 同等检查（push/PR 自动跑，见 .github/workflows/ci.yml）
-pnpm lint
+pnpm exec lint-staged   # pre-commit 模拟
+pnpm lint               # web + components + backend
 pnpm build
-pnpm test:e2e:smoke   # 本地可选；CI 在 MySQL + Playwright job 中跑
+pnpm test:e2e:smoke     # CI 自动；本地可选
 ```
+
+## ESLint AI Guardrails（硬门禁）
+
+配置：`eslint.ai-guardrails.mjs`（web/backend 共用）；`--max-warnings=0`。
+
+| 范围 | 函数 | 文件 | 参数 | 类/文件 | 魔法数字 |
+|------|------|------|------|---------|----------|
+| backend | ≤50 | ≤250 | ≤4 | 1 | `src/services/**` |
+| web + components | ≤80 | ≤250 | ≤4 | 1 | `src/service/**` |
 
 ### lint-staged 范围
 
-- `apps/web/**/*.{ts,tsx}` — ESLint（结构规则；`max-lines-per-function` ≤80 待启用）
+- `apps/web/**/*.{ts,tsx}`
 - `packages/components/**/*.{ts,tsx}`
-- `apps/backend/**/*.ts` — ESLint（含 `max-lines-per-function` ≤40）+ `tsc --noEmit`
-- `--max-warnings=0`（warning 也算失败）
+- `apps/backend/**/*.ts` — ESLint + `tsc --noEmit`
 
-**pre-commit 不覆盖：** 纯 CSS、JSON、配置文件 — 较大 backend 变更仍建议 `pnpm build`。
-
-### 含 backend 变更时
-
-额外通过 [后端代码质量门禁](./backend-quality.md)（函数粒度、Service 编排、无重复逻辑）。
-
-### 含 frontend TS/TSX 变更时
-
-额外通过 [前端代码质量门禁](./frontend-quality.md)（组件/hook 粒度、JSX 与逻辑分离）。
+**pre-commit 不覆盖：** 纯 CSS、JSON、配置文件。
 
 ## 代码标准
 
-- [ ] 禁止 `@ts-ignore`
-- [ ] 禁止随意 `any`
-- [ ] 组件使用 TypeScript，props 有类型
-- [ ] 每文件一个 default export 组件；hook/工具函数单独文件
-- [ ] 业务逻辑不堆在 JSX 里
-- [ ] 新请求：处理 loading + error + empty
-- [ ] Backend Service：见 [backend-quality.md](./backend-quality.md)
-- [ ] Frontend 组件/hook：见 [frontend-quality.md](./frontend-quality.md)
+- [ ] 禁止 `@ts-ignore`（backend ESLint 强制）
+- [ ] 禁止随意 `any`（backend 强制；frontend 靠 review）
+- [ ] 组件 TypeScript；props 有类型
+- [ ] 业务逻辑不堆 JSX；新请求处理 loading/error/empty
+- [ ] Backend：见 [backend-quality.md](./backend-quality.md)
+- [ ] Frontend：见 [frontend-quality.md](./frontend-quality.md)
 
-## ESLint 常见坑（本仓库）
+## ESLint 常见坑
 
 | 规则 | 修复方式 |
 |------|----------|
-| `react-refresh/only-export-components` | 将 hook/工具函数移到单独文件 |
-| `react-hooks/incompatible-library` | 仅 TanStack Virtual 可 targeted `eslint-disable-next-line` 并加注释 |
+| `max-lines-per-function` | 抽 hook / 子组件 / helper |
+| `max-lines` | 拆文件 |
+| `max-params` | 合并为 options 对象 |
+| `react-refresh/only-export-components` | hook/工具单独文件 |
 
-历史记录见 `.ai/memory/common-failures.md`。
+历史：`.ai/memory/common-failures.md`

@@ -99,7 +99,7 @@ export default function KnowledgeBasesPage() {
     useEffect(() => {
         if (selectedKb) void loadDocs(selectedKb.id);
         else setDocs([]);
-    }, [selectedKb?.id, loadDocs]);
+    }, [selectedKb, loadDocs]);
 
     const refreshPendingUploads = useCallback(async (kbId: number) => {
         try {
@@ -113,7 +113,7 @@ export default function KnowledgeBasesPage() {
     useEffect(() => {
         if (selectedKb) void refreshPendingUploads(selectedKb.id);
         else setPendingUploads([]);
-    }, [selectedKb?.id, refreshPendingUploads]);
+    }, [selectedKb, refreshPendingUploads]);
 
     const runChunkedUpload = useCallback(
         async (kbId: number, file: File, pending?: PendingChunkUploadView) => {

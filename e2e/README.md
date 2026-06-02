@@ -38,7 +38,11 @@ pnpm test:e2e:ui
 | `tests/smoke/knowledge-base.spec.ts` | `@smoke` | 新建 KB、打开 Finder、上传 txt |
 | `tests/integration/chat-sse.spec.ts` | `@integration` | `page.route` mock SSE，断言回复展示 |
 
-上传用例会调用后端 embedding API（与日常 dev 相同）；无向量配置时该条可能失败。
+上传用例会调用后端 embedding API（与日常 dev 相同）；无向量配置时该条可能失败。CI 未配置 `QWEN_API_KEY` 时自动 skip。
+
+## CI
+
+GitHub Actions [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)：`lint` → `build` → `@smoke` E2E（MySQL 8 service + 种子管理员）。可选仓库 Secret `QWEN_API_KEY` 以跑 embedding 上传用例。
 
 ## 与 Playwright MCP
 

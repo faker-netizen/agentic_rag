@@ -108,10 +108,10 @@ UI 登录仍保留单独 smoke spec 验证表单路径。
 
 ### Phase 3（CI）
 
-- [ ] `.github/workflows/e2e.yml`
-- [ ] MySQL service container + 种子用户
-- [ ] 或 test 环境 + 只跑 `@smoke`
-- [ ] 失败上传 `playwright-report` / trace
+- [x] `.github/workflows/ci.yml` — lint + build + `@smoke` E2E
+- [x] MySQL service container + 种子管理员（workflow env）
+- [x] 失败上传 `playwright-report` / `test-results` artifact
+- [ ] 可选：仓库 Secret `QWEN_API_KEY` 以在 CI 跑 embedding 上传用例（无则 skip）
 
 ---
 

@@ -63,6 +63,11 @@ test.describe("知识库与文档 @smoke", () => {
     });
 
     test("Finder 上传 txt 文档并出现在列表", async ({page, request}) => {
+        test.skip(
+            Boolean(process.env.CI && !process.env.QWEN_API_KEY?.trim()),
+            "CI 未配置 QWEN_API_KEY，跳过 embedding 上传用例"
+        );
+
         const token = await fetchAccessToken(request);
         const kbName = e2eUniqueName("E2E-Upload");
         const kbId = await createKnowledgeBaseApi(request, token, kbName);

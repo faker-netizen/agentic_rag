@@ -8,9 +8,10 @@
 # 模拟 pre-commit 对已暂存 web TS/TSX 的检查
 pnpm exec lint-staged
 
-# 较大变更建议额外执行
+# CI 同等检查（push/PR 自动跑，见 .github/workflows/ci.yml）
 pnpm lint
 pnpm build
+pnpm test:e2e:smoke   # 本地可选；CI 在 MySQL + Playwright job 中跑
 ```
 
 ### lint-staged 范围

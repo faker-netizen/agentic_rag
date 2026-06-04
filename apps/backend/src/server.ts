@@ -8,6 +8,7 @@ import { testConnection, initializeTables } from './config/database.js';
 import knowledgeBaseRoutes from './routes/knowledgeBases.js';
 import ragRoutes from './routes/rag.js';
 import chatRoutes from './routes/chat.js';
+import skillsRoutes from './routes/skills.js';
 import agentMinRoutes from './routes/agentMin.js';
 import authRoutes from './routes/auth.js';
 import { requireAuth } from './middleware/requireAuth.js';
@@ -59,6 +60,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/knowledge-bases', requireAuth, knowledgeBaseRoutes);
 app.use('/api/rag', requireAuth, ragRoutes);
 app.use('/api/chat', requireAuth, chatRoutes);
+app.use('/api/skills', requireAuth, skillsRoutes);
 app.use('/api/agent', requireAuth, agentMinRoutes);
 
 // 错误处理中间件

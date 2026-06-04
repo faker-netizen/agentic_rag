@@ -1,6 +1,6 @@
 # 功能规划（文档 AI 工作平台）
 
-> 最后更新：2026-05-31  
+> 最后更新：2026-06-03  
 > **用途**：描述产品目标、模块边界与功能 backlog；新功能开发前先对齐本文。  
 > **与 progress 分工**：本文写「要做什么」；`progress/CURRENT.md` 写「做到哪了」。  
 > **方向说明**：由早期「Design to Code」转为以 **文档 AI 工作平台** 为主（仓库名 `design_to_code` 暂保留，产品定位以本文为准）。
@@ -61,6 +61,42 @@
 - Skill  marketplace / 模板库
 - 跨域编排（一个请求触发多个域 Skill）
 
+### Skill 工坊（女娲式蒸馏 · F-11）
+
+> **参考**：[alchaincyf/nuwa-skill](https://github.com/alchaincyf/nuwa-skill)（开源「女娲」）— 面向 **Cursor/Agent Skills 协议**，输入人名/模糊需求 → 多阶段调研 → 产出可运行的 `SKILL.md`（心智模型、决策启发式、表达 DNA、验证清单）。  
+> **本产品不做同款文件落盘**；借鉴其 **流程与产物结构**，在 **F-00 运行时 Skill** 之上增加 **用户可创建/迭代业务域 Skill** 的工坊能力。
+
+| 维度 | 开源女娲 | 本平台 Skill 工坊（规划） |
+|------|----------|---------------------------|
+| 运行环境 | 开发者 Agent（Cursor 等） | 平台后端 + Web UI |
+| 产出物 | 磁盘 `*-perspective/SKILL.md` | DB **Skill 定义**（prompt、tools、scope、元数据） |
+| 信息源 | 公网调研 + 用户本地 PDF/字幕 | **优先用户知识库/上传文档**；公网人物调研 **非 MVP**（合规另议） |
+| 执行时 | 粘贴/加载 Skill 对话 | F-00 **Tool Call + RAG scope** + 流式 SSE |
+| 与 F-00 | 无关 | **强依赖** F-00 注册表与执行器 |
+
+**借鉴的流程映射（产品化）**
+
+```text
+Phase 0  入口：明确领域 / 模糊需求诊断 → 推荐模板或已有 Skill
+Phase 1  采集：选定 KB/文档 → 分块摘要、样例 Q&A、术语表（异步 Job）
+Phase 2  提炼：领域心智模型、决策规则、输出 schema、诚实边界（用户确认停点）
+Phase 3  构建：写入 Skill 注册表（版本号、可用 tools、默认 scope）
+Phase 4  验证：固定测例 + 对用户文档试跑 → 通过才「发布」
+```
+
+**分期（Backlog 见 F-11x）**
+
+- **MVP（F-11a）**：向导式创建 — 用户描述场景 → LLM 生成草稿定义 → 表单编辑 → 注册为「我的 Skill」（仅平台 tools 白名单）
+- **增强（F-11b）**：绑定知识库自动提炼规则与示例问题（材料驱动，类女娲 Phase 1–2）
+- **可选（F-11c）**：「视角/顾问」类 Skill（人设 + 回答协议），回答 **必须带 citation**，禁止无依据公网编造
+
+**明确不纳入（首期）**
+
+- 一键蒸馏公众人物并爬取全网语料（版权/合规/运维成本高）
+- 生成 Cursor `.cursor/skills/` 文件（属开发 harness，见 F-03；需要时可 `npx skills add alchaincyf/nuwa-skill` 自用，与产品无关）
+
+详细方案草案：`.ai/planning/feat-f-11-skill-studio/README.md`（待 T3 需求确认后展开 01/02）。
+
 ---
 
 ## 模块地图
@@ -73,6 +109,7 @@
 | **RAG 基础** | 向量检索、增强生成 | `pages/rag` | `ragService` | ✅ 已有，将纳入域 Skill |
 | **RAG 对话** | 会话、流式、引用 | `pages/chat`（Dock） | `chatService` | ✅ 已有，将演进为域 Skill 入口 |
 | **业务域 Skill** | 域路由 + Tool Call + 文档 scope | 待设计 | **核心建设** | 📋 **P0** |
+| **Skill 工坊** | 女娲式创建/提炼/验证 → 注册表 | 待设计（Dock 或 KB 内） | `skillStudioService` 等 | 📋 **P1**（依赖 F-00） |
 | **ChatPDF** | PDF 专注对话与标注 | Dock 占位 | 扩展 document 类型 | 📋 P1 |
 | **Agent** | 多步工具调用 | `pages/agent` | agent 相关 | 🟡 部分，可复用于 Tool 层 |
 | **内容采集** | 公众号 / URL 抓取、清洗入库 | 未建 | 未建 | 📋 Phase 3 |
@@ -97,6 +134,16 @@
 - [ ] 域路由 + 至少 1 个示例域 Skill 端到端
 - [ ] 对话 UI 展示「当前 Skill / 引用」
 - [ ] `chatService` / Agent 层 refactor（为 Skill 执行器让路）
+
+### Phase 1.5 — Skill 工坊（F-11，依赖 F-00 MVP）
+
+目标：用户 **描述场景 +（可选）绑定知识库** → **生成/迭代业务域 Skill 定义** → **试跑验证** → **在对话中选用**。
+
+- [ ] Skill 定义数据模型与版本（租户隔离）
+- [ ] F-11a 向导创建 + 草稿/发布状态
+- [ ] F-11b KB 材料驱动提炼（异步 Job + 用户确认停点）
+- [ ] 试跑 API（复用 F-00 执行器 + 固定测例）
+- [ ] 对话入口展示「当前 Skill」并支持切换「我的 Skill」
 
 ### Phase 2 — 文档应用矩阵
 
@@ -137,10 +184,15 @@
 | F-05 | ChatPDF 应用 | P1 | F-00 | PDF 域 tools |
 | F-04 | 知识库 Dock 应用 | P1 | 桌面壳 | |
 | F-10 | 公众号 / URL 采集 MVP | P2 | 文档管线 | Phase 3 |
+| **F-11** | **Skill 工坊（女娲式蒸馏，产品化）** | **P1** | **F-00** | 见上文 §Skill 工坊 |
+| F-11a | 向导创建 Skill 草稿 → 发布 | P1 | F-00 注册表 | MVP，无 KB 自动提炼 |
+| F-11b | KB 材料驱动提炼 + 确认停点 | P2 | F-11a、文档管线 | 类女娲 Phase 1–2 |
+| F-11c | 视角/顾问类 Skill + 强制 citation | P2 | F-11a、F-00b | 可选；公网调研非 MVP |
+| **F-12** | **文档索引 + 预摘要 + 全库概览 Skill**（上传默认仅入库、Finder 按钮、 `kb-catalog`） | **P1** | F-00、文档管线 | 规划：`feat-f-12-doc-index-summary`；取代原「仅 indexing_status」窄范围 |
 | F-07 | CI workflow | P2 | — | |
 | ~~F-09~~ | ~~Design → Code~~ | — | — | 已搁置 |
 
-开工前：`.ai/templates/feature-brief.md`；核心功能建议单独存档 `progress/log/`。
+开工前：**Agent 提议档位 → 用户确认** → 按 [planning/README.md](./README.md) 落盘（T0→`fixes/`；T1 lite；T2/T3 完整 01+02）；完成后 `progress/log/`。
 
 ---
 
@@ -165,6 +217,9 @@
 | **Tool Call** | 对检索、摘要、抽取等原子能力的可调用接口 |
 | **文档 scope** | 单次 Skill 执行允许访问的 KB / 文档 ID 集合 |
 | **域路由** | 将用户输入映射到某一业务域 Skill 的过程 |
+| **文档索引** | 文本分块 + 向量写入 `embeddings`；与「分片上传」无关；非所有入库文档都必须索引 |
+| **Skill 工坊** | 创建/迭代/验证业务域 Skill 定义的产品模块（流程借鉴开源女娲） |
+| **Skill 定义** | 可版本化的配置：名称、描述、system 策略、可用 tools、默认 scope、测例 |
 
 ---
 

@@ -1,13 +1,14 @@
-import {Button, Empty, Popconfirm, Spin} from "antd";
-import {DeleteOutlined, FileOutlined} from "@ant-design/icons";
+import {Empty, Spin} from "antd";
 import type {KnowledgeBaseDocument} from "@/service/knowledgeBaseApi.ts";
-import {fileTypeLabel, formatDate} from "@/pages/knowledge-bases/finderUtils.ts";
+import KnowledgeBaseDocumentRow from "@/pages/knowledge-bases/KnowledgeBaseDocumentRow.tsx";
 
 type KnowledgeBaseDocumentListProps = {
     docs: KnowledgeBaseDocument[];
     loading: boolean;
     error: string | null;
     onDelete: (doc: KnowledgeBaseDocument) => void;
+    onSummarize: (doc: KnowledgeBaseDocument) => void;
+    onIndex: (doc: KnowledgeBaseDocument) => void;
 };
 
 export default function KnowledgeBaseDocumentList({
@@ -15,6 +16,8 @@ export default function KnowledgeBaseDocumentList({
     loading,
     error,
     onDelete,
+    onSummarize,
+    onIndex,
 }: KnowledgeBaseDocumentListProps) {
     if (loading) {
         return (
@@ -44,27 +47,13 @@ export default function KnowledgeBaseDocumentList({
     return (
         <ul className="kb-finder__list">
             {docs.map((doc) => (
-                <li key={doc.id} className="kb-finder__row">
-                    <div className="kb-finder__row-icon">
-                        <FileOutlined />
-                    </div>
-                    <div className="kb-finder__row-main">
-                        <span className="kb-finder__row-title">{doc.title}</span>
-                        <span className="kb-finder__row-meta">
-                            {fileTypeLabel(doc.file_type)} · {formatDate(doc.created_at)}
-                        </span>
-                    </div>
-                    <Popconfirm title="删除该文档？" onConfirm={() => onDelete(doc)}>
-                        <Button
-                            type="text"
-                            size="small"
-                            danger
-                            icon={<DeleteOutlined />}
-                            aria-label="删除"
-                            className="kb-finder__row-delete"
-                        />
-                    </Popconfirm>
-                </li>
+                <KnowledgeBaseDocumentRow
+                    key={doc.id}
+                    doc={doc}
+                    onDelete={onDelete}
+                    onSummarize={onSummarize}
+                    onIndex={onIndex}
+                />
             ))}
         </ul>
     );

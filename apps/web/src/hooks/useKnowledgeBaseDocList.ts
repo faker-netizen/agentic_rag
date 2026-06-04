@@ -15,21 +15,25 @@ export function useKnowledgeBaseDocList(kbId: number | null) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const refreshDocs = useCallback(async () => {
+    const refreshDocs = useCallback(async (options?: {silent?: boolean}) => {
         if (kbId == null) {
             setDocs([]);
             return;
         }
-        setLoading(true);
-        setError(null);
+        if (!options?.silent) {
+            setLoading(true);
+            setError(null);
+        }
         try {
             const list = await listDocuments(kbId);
             setDocs(list);
         } catch (e) {
-            setError(errMsg(e));
-            setDocs([]);
+            if (!options?.silent) {
+                setError(errMsg(e));
+                setDocs([]);
+            }
         } finally {
-            setLoading(false);
+            if (!options?.silent) setLoading(false);
         }
     }, [kbId]);
 

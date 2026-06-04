@@ -6,6 +6,7 @@ import type {KnowledgeBaseDocument} from "@/service/knowledgeBaseApi.ts";
 import KnowledgeBaseFinderToolbar from "@/pages/knowledge-bases/KnowledgeBaseFinderToolbar.tsx";
 import PendingUploadAlerts from "@/pages/knowledge-bases/PendingUploadAlerts.tsx";
 import KnowledgeBaseDocumentList from "@/pages/knowledge-bases/KnowledgeBaseDocumentList.tsx";
+import {useDocumentProcessingActions} from "@/pages/knowledge-bases/useDocumentProcessingActions.ts";
 import {useResumeUploadInput} from "@/pages/knowledge-bases/useResumeUploadInput.ts";
 import "./finder.css";
 
@@ -14,6 +15,10 @@ export default function KnowledgeBaseFinder() {
     const kbId = meta?.knowledgeBaseId ?? null;
 
     const docState = useKnowledgeBaseDocuments(kbId);
+    const processing = useDocumentProcessingActions({
+        kbId,
+        onRefresh: docState.refreshDocs,
+    });
     const {resumeInputRef, onResumeFileChange} = useResumeUploadInput(
         docState.consumeResumePending,
         docState.resumePendingUpload
@@ -73,6 +78,8 @@ export default function KnowledgeBaseFinder() {
                     loading={docState.loading}
                     error={docState.error}
                     onDelete={onDelete}
+                    onSummarize={processing.onSummarize}
+                    onIndex={processing.onIndex}
                 />
             </div>
             <ChunkUploadModal

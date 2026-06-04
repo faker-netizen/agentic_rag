@@ -24,11 +24,13 @@
 
 浏览器打开页面；调整视口大小；如有聊天/列表区域则测试滚动。
 
-**自动化 smoke（UI 主路径变更时推荐）：**
+**E2E（须经用户同意后再跑）：**
 
 ```bash
 pnpm test:e2e:smoke
 ```
+
+Agent 默认不主动执行；用户确认后再跑。CI 仍自动跑 smoke。
 
 参考：[`e2e/README.md`](../../e2e/README.md)、`.cursor/rules/scrollable-layout.mdc`
 

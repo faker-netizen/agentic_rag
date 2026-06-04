@@ -18,6 +18,7 @@ export type ChatMessage = {
     role: string;
     content: string;
     sources_json: unknown | null;
+    skill_id?: string | null;
     created_at: string;
 };
 
@@ -66,6 +67,8 @@ export type SendMessageResult = {
 
 export type StreamChatHandlers = {
     onMeta: (p: {userMessageId: number}) => void;
+    onSkill?: (p: {skillId: string; skillName: string}) => void;
+    onStatus?: (p: {phase: string; label: string}) => void;
     onSources: (p: {sources: ChatSource[] | null}) => void;
     onToken: (p: {text: string}) => void;
     onError: (p: {message: string}) => void;
@@ -78,15 +81,22 @@ export async function streamChatMessage(
     sessionId: number,
     content: string,
     handlers: StreamChatHandlers,
-    options?: {signal?: AbortSignal}
+    options?: {signal?: AbortSignal; skillId?: string | null}
 ): Promise<void> {
     const url = `${apiBase()}/api/chat/sessions/${sessionId}/messages`;
+    const body: {content: string; skillId?: string | null} = {content};
+    if (options?.skillId !== undefined) body.skillId = options.skillId;
 
     await fetchSsePost(
         url,
-        {content},
+        body,
         (event, data) => {
             if (event === "meta") handlers.onMeta({userMessageId: Number(data.userMessageId)});
+            else if (event === "skill")
+                handlers.onSkill?.({
+                    skillId: String(data.skillId ?? ""),
+                    skillName: String(data.skillName ?? ""),
+                });
             else if (event === "sources")
                 handlers.onSources({sources: (data.sources as ChatSource[] | null) ?? null});
             else if (event === "token") handlers.onToken({text: String(data.text ?? "")});
@@ -105,6 +115,7 @@ export async function streamChatMessage(
             getToken: getAccessToken,
             refreshToken: refreshAccessToken,
             signal: options?.signal,
+            onStatus: handlers.onStatus,
         }
     );
 }

@@ -1,15 +1,24 @@
 import type express from "express";
-import ragService, {type RagStreamPart} from "../services/ragService.js";
 import knowledgeBaseService from "../services/knowledgeBaseService.js";
-import {resolveSourcesFromChunks} from "../utils/ragSources.js";
+import {runDomainSkill} from "../domainSkill/domainSkillExecutor.js";
+import {SKILL_ID_KB_RAG, assertKnownSkillId} from "../domainSkill/skillRegistry.js";
+import {DomainSkillError} from "../domainSkill/types.js";
 import {getUserId, parsePositiveInt} from "../utils/routeHelpers.js";
 import {isStreamAborted} from "../utils/streamAbort.js";
-import {bindRequestAbort, createSseWriter, setupSseResponse} from "../utils/sse.js";
+import {SSE_HEARTBEAT_INTERVAL_MS} from "../services/serviceConstants.js";
+import {
+    bindRequestAbort,
+    createSseWriter,
+    setupSseResponse,
+    startSseHeartbeat,
+} from "../utils/sse.js";
+import {emitStatus} from "../domainSkill/emitStatus.js";
 
 type RagQueryInput = {
     userId: number;
     query: string;
     knowledgeBaseId: number;
+    skillId: string;
 };
 
 async function parseRagQueryInput(
@@ -22,7 +31,7 @@ async function parseRagQueryInput(
         return null;
     }
 
-    const {query, knowledgeBaseId: kbRaw} = req.body ?? {};
+    const {query, knowledgeBaseId: kbRaw, skillId: skillRaw} = req.body ?? {};
     if (!query || typeof query !== "string") {
         res.status(400).json({error: "查询内容不能为空"});
         return null;
@@ -40,55 +49,45 @@ async function parseRagQueryInput(
         return null;
     }
 
-    return {userId, query: query.trim(), knowledgeBaseId};
-}
+    const skillId =
+        skillRaw === null || skillRaw === undefined || skillRaw === ""
+            ? SKILL_ID_KB_RAG
+            : String(skillRaw);
 
-async function emitRagStreamPart(
-    part: RagStreamPart,
-    input: RagQueryInput,
-    sse: ReturnType<typeof createSseWriter>,
-    state: {answer: string; sources: Awaited<ReturnType<typeof resolveSourcesFromChunks>>}
-): Promise<void> {
-    if (part.type === "context") {
-        state.sources =
-            part.chunks.length > 0
-                ? await resolveSourcesFromChunks(part.chunks, input.userId, input.knowledgeBaseId)
-                : [];
-        sse("sources", {sources: state.sources});
-        return;
-    }
-    state.answer += part.text;
-    sse("token", {text: part.text});
+    return {userId, query: query.trim(), knowledgeBaseId, skillId};
 }
 
 async function streamRagQueryAnswer(
-    res: express.Response,
     input: RagQueryInput,
+    sse: ReturnType<typeof createSseWriter>,
     signal: AbortSignal
-): Promise<void> {
-    const sse = createSseWriter(res);
-    const state = {answer: "", sources: [] as Awaited<ReturnType<typeof resolveSourcesFromChunks>>};
-
+): Promise<{answer: string; sources: unknown}> {
     try {
-        for await (const part of ragService.answerWithRAGStream(input.query, {
+        const skillId = assertKnownSkillId(input.skillId);
+        const result = await runDomainSkill({
+            skillId,
             userId: input.userId,
             knowledgeBaseId: input.knowledgeBaseId,
-            k: 3,
+            query: input.query,
+            history: [],
+            sse,
             signal,
-        })) {
-            await emitRagStreamPart(part, input, sse, state);
-        }
+        });
+        return {answer: result.answer, sources: result.sources ?? []};
     } catch (e) {
         if (isStreamAborted(e, signal)) {
             sse("aborted", {stopped: true});
-        } else {
-            const message = e instanceof Error ? e.message : "查询失败";
-            state.answer = `生成失败：${message}`;
-            sse("error", {message: state.answer});
+            return {answer: "", sources: []};
         }
+        if (e instanceof DomainSkillError) {
+            sse("error", {message: e.message, code: e.code});
+            emitStatus(sse, "failed", e.message);
+            return {answer: e.message, sources: []};
+        }
+        const message = e instanceof Error ? e.message : "查询失败";
+        sse("error", {message});
+        return {answer: `生成失败：${message}`, sources: []};
     }
-
-    sse("done", {answer: state.answer, sources: state.sources});
 }
 
 export async function handleRagQuery(req: express.Request, res: express.Response): Promise<void> {
@@ -98,9 +97,13 @@ export async function handleRagQuery(req: express.Request, res: express.Response
 
         setupSseResponse(res);
         const {signal, cleanup} = bindRequestAbort(req);
+        const stopHeartbeat = startSseHeartbeat(res, SSE_HEARTBEAT_INTERVAL_MS);
+        const sse = createSseWriter(res);
         try {
-            await streamRagQueryAnswer(res, input, signal);
+            const state = await streamRagQueryAnswer(input, sse, signal);
+            sse("done", {answer: state.answer, sources: state.sources});
         } finally {
+            stopHeartbeat();
             cleanup();
         }
         res.end();

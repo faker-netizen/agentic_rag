@@ -1,10 +1,12 @@
-import {Button, Input, Spin, Tag} from "antd";
-import {SendOutlined, StopOutlined} from "@ant-design/icons";
+import {Spin, Tag, Typography} from "antd";
+import type {DomainSkillItem} from "@/service/skillsApi.ts";
 import type {RefObject} from "react";
 import type {ChatMessage, ChatSession} from "@/service/chatApi.ts";
 import ChatMessageVirtualList, {
     type ChatMessageVirtualListHandle,
 } from "@/components/ChatMessageVirtualList.tsx";
+import ChatSkillSelect from "@/pages/chat/ChatSkillSelect.tsx";
+import ChatComposer from "@/pages/chat/ChatComposer.tsx";
 
 type ChatConversationProps = {
     session: ChatSession | null;
@@ -12,6 +14,11 @@ type ChatConversationProps = {
     loadingMessages: boolean;
     streamingAssistantId: number | null;
     streamDisplay: string;
+    streamStatus: string | null;
+    activeSkillName: string | null;
+    skills: DomainSkillItem[];
+    selectedSkillId: string | null;
+    onSkillChange: (id: string | null) => void;
     messageListRef: RefObject<ChatMessageVirtualListHandle | null>;
     input: string;
     sending: boolean;
@@ -26,6 +33,11 @@ export default function ChatConversation({
     loadingMessages,
     streamingAssistantId,
     streamDisplay,
+    streamStatus,
+    activeSkillName,
+    skills,
+    selectedSkillId,
+    onSkillChange,
     messageListRef,
     input,
     sending,
@@ -39,12 +51,22 @@ export default function ChatConversation({
                 <span className="chat-main__title">{session?.title ?? "会话"}</span>
                 {session?.knowledge_base_id != null && (
                     <Tag style={{marginLeft: 8}} color="blue">
-                        RAG 知识库
+                        知识库
+                    </Tag>
+                )}
+                {activeSkillName && (
+                    <Tag style={{marginLeft: 8}} color="purple">
+                        {activeSkillName}
                     </Tag>
                 )}
             </div>
 
             <div className="chat-messages-panel">
+                {streamStatus && (
+                    <div className="chat-stream-status">
+                        <Typography.Text type="secondary">{streamStatus}</Typography.Text>
+                    </div>
+                )}
                 {loadingMessages && (
                     <div className="chat-messages-panel__loading">
                         <Spin />
@@ -60,42 +82,21 @@ export default function ChatConversation({
             </div>
 
             <div className="chat-composer-wrap">
-                <div className="chat-composer">
-                    <Input.TextArea
-                        value={input}
-                        onChange={(e) => onInputChange(e.target.value)}
-                        placeholder="输入消息，Enter 发送（Shift+Enter 换行）"
-                        autoSize={{minRows: 1, maxRows: 6}}
-                        variant="borderless"
-                        onPressEnter={(e) => {
-                            if (!e.shiftKey) {
-                                e.preventDefault();
-                                onSend();
-                            }
-                        }}
-                        disabled={sending}
+                {session?.knowledge_base_id != null && (
+                    <ChatSkillSelect
+                        skills={skills}
+                        selectedSkillId={selectedSkillId}
+                        sending={sending}
+                        onSkillChange={onSkillChange}
                     />
-                    <div className="chat-composer__actions">
-                        <Button
-                            danger
-                            size="small"
-                            icon={<StopOutlined />}
-                            disabled={!sending}
-                            onClick={onStopStream}
-                        >
-                            停止
-                        </Button>
-                        <Button
-                            type="primary"
-                            size="small"
-                            icon={<SendOutlined />}
-                            loading={sending}
-                            onClick={onSend}
-                        >
-                            发送
-                        </Button>
-                    </div>
-                </div>
+                )}
+                <ChatComposer
+                    input={input}
+                    sending={sending}
+                    onInputChange={onInputChange}
+                    onSend={onSend}
+                    onStopStream={onStopStream}
+                />
             </div>
         </>
     );

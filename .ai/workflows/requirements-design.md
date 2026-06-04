@@ -1,75 +1,61 @@
 # 需求分析与方案设计工作流
 
-适用于**尚未写正式业务代码**的阶段。与 [功能开发](./feature-development.md) 衔接：本流程产出设计 → 下一流程实现。
+适用于**尚未写正式业务代码**的阶段（**T1 / T2 / T3**）。**T0** 走 [bugfix](./bugfix.md)。
 
-## 1. 建立上下文
+**生命周期**：[agent-lifecycle.md](./agent-lifecycle.md)  
+**档位与落盘**：[planning/README.md](../planning/README.md)
 
-- 读 [FEATURE-PLAN](../planning/FEATURE-PLAN.md)（本产品范围、阶段、F-00 等）
-- 读 [CURRENT](../progress/CURRENT.md)（续作时）
-- 确认用户意图：要解决什么问题？谁用？成功长什么样？
+---
 
-**停止条件：** 关键信息缺失 → 列出问题清单，等用户回复后再继续。
+## 0. 建立上下文 + 定级 ⏸
 
-## 2. 需求澄清
+- 读 [FEATURE-PLAN](../planning/FEATURE-PLAN.md)、[CURRENT](../progress/CURRENT.md)
+- Agent **提议** T0–T3 + slug + 理由（见 [tier-classification](../gates/tier-classification.md)）
+- **停止**，请用户确认档位
+- **T0** → 转 [bugfix](./bugfix.md)，**退出本 workflow**
+- **T1+** → 创建目录，**先写** `.ai/planning/<slug>/00-change-meta.md`（定级确认记录：已确认）
 
-按下面维度整理（不必全写进文档，但 Agent 须心里有数）：
+---
 
-| 维度 | 问题 |
-|------|------|
-| 目标 | 用户痛点 / 业务价值是什么？ |
-| 范围 | 纳入什么？明确不做什么？ |
-| 用户 | 谁操作？鉴权边界？ |
-| 数据 | 读写什么？与知识库/会话/文档的关系？ |
-| 交互 | 页面还是 API？是否 SSE 流式？ |
-| 约束 | 性能、安全、兼容、工期 |
+## T1 小改（1 停点 + lite 文档）
 
-可选产出：`.ai/templates/feature-brief.md`
+> 禁止写 `01-requirements.md` + `02-solution-design.md` 双文件流程。
 
-## 3. 现状调研
+1. 调研邻近代码（简要）
+2. 按 `.ai/templates/change-lite.md` **写入** `01-change-lite.md`
+3. Gate：[change-lite-review](../gates/change-lite-review.md)
+4. **停止**，请用户 review lite 文档
+5. 确认 ✅ → [功能开发](./feature-development.md)
 
-在仓库内搜索，避免重复造轮子：
+---
+
+## T2 / T3 完整流程（2 停点）
+
+### 阶段 1：需求分析 ⏸
+
+1. 按 `.ai/templates/feature-brief.md` **写入** `01-requirements.md`
+2. Gate：[requirements-review](../gates/requirements-review.md)
+3. **停止** → 用户确认 → 更新确认记录
+
+### 阶段 2：方案设计 ⏸
+
+1. 调研代码；T2 侧重回归/迁移，T3 侧重多方案对比
+2. 按 `.ai/templates/solution-design.md` **写入** `02-solution-design.md`（AC + 变更范围必填）
+3. Gate：[design-review](../gates/design-review.md)
+4. **停止** → 用户确认 → 可选 `03-implementation-plan.md`（T3 推荐）→ [功能开发](./feature-development.md)
+
+---
+
+## 分工摘要
 
 ```text
-- 类似 UI / 页面 → apps/web/src/pages、desktop/
-- 类似 API → apps/backend/src/routes、services/
-- 共享能力 → packages/components、utils/
-- 流式/SSE → apps/backend/src/utils/sse.ts、apps/web/src/service/sseClient.ts
+S0.5  定级 ⏸
+T1    00-meta + 01-change-lite ⏸ → 实现
+T2/T3 00-meta + 01 ⏸ + 02 ⏸ (+03) → 实现
+T0    → bugfix（fixes/ 目录）
 ```
 
-记录：**可复用** / **需扩展** / **需新建**。
+## 记忆与规划
 
-## 4. 方案设计
-
-至少给出 **1 个推荐方案**；存在明显 trade-off 时给出 **2+ 备选** 并对比：
-
-| 对比项 | 方案 A | 方案 B |
-|--------|--------|--------|
-| 实现复杂度 | | |
-| 与现有架构一致性 | | |
-| 可测试性 / 可维护性 | | |
-| 风险 | | |
-
-说明推荐理由。涉及 API 时草拟路径与方法；涉及 UI 时说明入口（桌面壳窗口 / 路由）。
-
-可选产出：`.ai/templates/solution-design.md`
-
-## 5. 设计评审（Gate）
-
-阅读并通过 `.ai/gates/design-review.md`。
-
-- 用户要求「先出方案不要写代码」→ 到此步停止，交付文档
-- 用户确认方案 → 可生成 `.ai/templates/implementation-plan.md` 并进入 [功能开发](./feature-development.md)
-
-## 6. 记忆与规划
-
-- 与 FEATURE-PLAN 新增/调整 backlog → 提议更新 `FEATURE-PLAN.md`（经用户同意）
-- 架构级决策 → 实现后写入 `memory/project-decisions.md`
-
-## 与 feature-development 的分工
-
-```
-requirements-design（本流程）  →  问清楚、调研、比方案、出文档
-feature-development           →  pre-implementation gate、编码、lint、提交、存档
-```
-
-Trivial 改动（用户明确、单文件、< ~20 行）可跳过本流程，直接 feature-development 或 bugfix。
+- backlog → 提议更新 `FEATURE-PLAN.md`
+- 架构决策 → `memory/project-decisions.md`

@@ -45,8 +45,14 @@
 
 - **决策：** 新增全局 skill `requirements-design`（需求分析 + 方案设计），与 `feature-development`（实现）分离；非 trivial 需求先过 `design-review` gate。
 - **原因：** 避免 Agent 未澄清即写代码；方案可评审、可存档，再进入实现。
-- **产出物：** `feature-brief`（小）、`solution-design`（中以上）、`implementation-plan`（待实现）。
+- **决策：** 变更四档 T0–T3；Agent 提议 + 用户确认；T0→`.ai/fixes/`；T1→lite 单停点；T2/T3→完整 01+02。见 `planning/README.md`。
 - **参考：** `.ai/workflows/requirements-design.md`、`.ai/gates/design-review.md`
+
+## 2026-06 — F-12：入库 ≠ 索引 ≠ 摘要
+
+- **决策：** 文档上传默认 **仅落库全文**；**向量索引**与 **LLM 预摘要** 由用户在知识库 Finder **分别显式触发**；全库总结类问答走 Skill **`kb-catalog`**（列举文档 + 读已存摘要），不在聊天内自动批量摘要（MVP）。
+- **原因：** 对齐「总结库里所有文件」产品预期；控制成本；与 F-00 `kb_search` 语义检索分工。
+- **参考：** `.ai/planning/feat-f-12-doc-index-summary/01-requirements.md`
 
 ## 2026-05 — Cursor MCP（Context7 + Playwright）
 

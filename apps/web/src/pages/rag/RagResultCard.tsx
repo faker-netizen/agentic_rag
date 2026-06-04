@@ -14,15 +14,21 @@ type RagResultCardProps = {
     answer: string;
     sources: RagSource[];
     submitting: boolean;
+    streamStatus: string | null;
 };
 
-export default function RagResultCard({answer, sources, submitting}: RagResultCardProps) {
+export default function RagResultCard({answer, sources, submitting, streamStatus}: RagResultCardProps) {
     if (!answer && sources.length === 0 && !submitting) return null;
 
     return (
         <Card title="结果">
+            {streamStatus && (
+                <Typography.Text type="secondary" style={{display: "block", marginBottom: 8}}>
+                    {streamStatus}
+                </Typography.Text>
+            )}
             <MarkdownContent content={answer || (submitting ? "" : "")} />
-            {submitting && !answer && (
+            {submitting && !answer && !streamStatus && (
                 <Typography.Text type="secondary">生成中…</Typography.Text>
             )}
             {sources.length > 0 && (

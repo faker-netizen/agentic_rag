@@ -1,4 +1,4 @@
-import {useRef} from "react";
+import {useEffect, useRef} from "react";
 import {Layout} from "antd";
 import type {ChatMessageVirtualListHandle} from "@/components/ChatMessageVirtualList.tsx";
 import {useRafStreamBuffer} from "@/hooks/useRafStreamBuffer.ts";
@@ -9,6 +9,7 @@ import CreateSessionModal from "@/pages/chat/CreateSessionModal.tsx";
 import {useChatSessions} from "@/pages/chat/useChatSessions.ts";
 import {useChatMessages} from "@/pages/chat/useChatMessages.ts";
 import {useChatSend} from "@/pages/chat/useChatSend.ts";
+import {useChatSkills} from "@/pages/chat/useChatSkills.ts";
 import "./chat.css";
 
 const {Content, Sider} = Layout;
@@ -21,9 +22,14 @@ export default function ChatPage() {
     });
 
     const sessions = useChatSessions();
+    const chatSkills = useChatSkills();
+    useEffect(() => {
+        void chatSkills.loadSkills();
+    }, [chatSkills]);
     const {messages, setMessages, loadingMessages, loadMessages} = useChatMessages(sessions.selectedId);
     const send = useChatSend({
         selectedId: sessions.selectedId,
+        selectedSkillId: chatSkills.selectedSkillId,
         streamBuffer,
         setMessages,
         loadMessages,
@@ -57,6 +63,11 @@ export default function ChatPage() {
                             loadingMessages={loadingMessages}
                             streamingAssistantId={send.streamingAssistantId}
                             streamDisplay={streamBuffer.display}
+                            streamStatus={send.streamStatus}
+                            activeSkillName={send.activeSkillName}
+                            skills={chatSkills.skills}
+                            selectedSkillId={chatSkills.selectedSkillId}
+                            onSkillChange={chatSkills.setSelectedSkillId}
                             messageListRef={messageListRef}
                             input={send.input}
                             sending={send.sending}

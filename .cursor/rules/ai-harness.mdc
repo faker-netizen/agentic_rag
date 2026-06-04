@@ -16,7 +16,8 @@ alwaysApply: true
 | `.ai/templates/` | 产出物格式模板 |
 | `.ai/memory/` | 项目决策与失败日志 |
 | `.ai/progress/` | **进度存档**（新会话入口 `CURRENT.md`，功能完成写 `log/`） |
-| `.ai/planning/FEATURE-PLAN.md` | **功能规划**（模块、阶段、backlog；新功能前先对齐） |
+| `.ai/planning/` | FEATURE-PLAN + **T1–T3** 变更落盘（见 `planning/README.md`） |
+| `.ai/fixes/` | **T0** Bug 修复落盘 |
 | `.cursor/mcp.json` | **MCP 服务器**（Context7、Playwright） |
 | `.cursor/MCP.md` | MCP 用途、Agent 约定、故障排查 |
 
@@ -26,12 +27,13 @@ alwaysApply: true
 |----------|---------------|--------|-------|
 | **新会话 / 续作 / 进度** | — | `project-progress` | — |
 | **功能规划 / roadmap / 做什么** | `.ai/planning/FEATURE-PLAN.md` | — | — |
-| **需求分析 / 方案设计 / 技术方案** | `.ai/workflows/requirements-design.md` | `requirements-design` | `design-review` |
+| **任何新任务 / 改需求** | `.ai/planning/README.md` | — | `tier-classification` |
+| **需求分析 / 方案设计** | `.ai/workflows/requirements-design.md` | `requirements-design` | `tier-classification`、`change-lite-review` 或 `requirements-review`+`design-review` |
 | Git 提交 / 暂存变更 | — | `.cursor/skills/commit-workflow/` | `.ai/gates/code-quality.md` |
 | 新功能 / 实现（方案已清） | `.ai/workflows/feature-development.md` | `feature-development` | `pre-implementation`、`code-quality` |
 | UI 页面 / 布局 / 桌面壳 | `.ai/workflows/ui-page-development.md` | `ui-page-development`、`css-layout`、`scrollable-layout`、`macbook-ui`、`frontend-component` | `frontend-quality`、`ui-quality`、`code-quality` |
 | 前端组件 / 页面逻辑拆分 | — | `frontend-component` | `frontend-quality` |
-| Bug 修复 | `.ai/workflows/bugfix.md` | — | `code-quality` |
+| Bug 修复（T0） | `.ai/workflows/bugfix.md` | `bugfix` | `tier-classification`、`code-quality` |
 | 后端 Service / API | — | `backend-service` | `backend-quality`、`api-contract` |
 | Harness / 工作流设计 | — | `harness-engineering` | — |
 | 第三方库 API / 版本 / 文档 | — | **Context7 MCP** | — |
@@ -41,7 +43,7 @@ alwaysApply: true
 ## Agent 协议
 
 0. **续作** — 新会话或用户说「继续项目」：先读 `.ai/progress/CURRENT.md`；做新功能前读 `.ai/planning/FEATURE-PLAN.md` 对齐范围。
-1. **开始** — 匹配路由表；**非 trivial 新需求先走 `requirements-design`**，方案确认后再 `feature-development`；其余任务阅读对应 workflow 及 skill。
+1. **开始** — 匹配路由表；**先 `tier-classification`（Agent 提议 T0–T3，用户确认）** → T0 `bugfix` / T1–T3 `requirements-design` → `feature-development`；生命周期见 `.ai/workflows/agent-lifecycle.md`。
 2. **实现** — 遵循所 touch 文件对应的 `.cursor/rules/*.mdc`；外部库 API 不确定时用 **Context7 MCP**（详见 `.cursor/MCP.md`）。
 3. **验证** — 跑 gates（lint、build）；前端/UI 改动可用 **Playwright MCP** 在本地 dev 上复验；宣称完成前阅读 `.ai/gates/`。
 4. **纠错** — hook/CI 失败时读 `.ai/memory/common-failures.md`；修复后重新验证。
@@ -66,8 +68,9 @@ alwaysApply: true
 
 | Skill | 用途 |
 |-------|------|
-| `requirements-design` | 需求分析 / 方案设计 |
-| `feature-development` | 端到端功能实现（方案已清） |
+| `requirements-design` | 定级后 T1 lite / T2–T3 完整设计 |
+| `bugfix` | T0 Bug 修复 |
+| `feature-development` | 设计确认后的实现 |
 | `ui-page-development` | 页面 / 桌面壳工作流入口 |
 | `css-layout` | Flex 优先布局 |
 | `scrollable-layout` | 页内滚动 / 虚拟列表 |

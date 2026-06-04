@@ -4,6 +4,7 @@ import type {FormInstance} from "antd";
 import {listKnowledgeBases, type KnowledgeBase} from "@/service/knowledgeBaseApi.ts";
 import {streamRagQuery, type RagSource} from "@/service/ragApi.ts";
 import {RequestError} from "@/service/request.ts";
+import {isAbortError, streamErrText} from "@/pages/chat/chatUtils.ts";
 
 function errMsg(e: unknown): string {
     return e instanceof RequestError ? e.message : "请求失败，请稍后重试";
@@ -41,6 +42,7 @@ export function useRagQuery() {
     const [submitting, setSubmitting] = useState(false);
     const [answer, setAnswer] = useState("");
     const [sources, setSources] = useState<RagSource[]>([]);
+    const [streamStatus, setStreamStatus] = useState<string | null>(null);
 
     useEffect(() => {
         return () => abortRef.current?.abort();
@@ -54,14 +56,17 @@ export function useRagQuery() {
         setSubmitting(true);
         setAnswer("");
         setSources([]);
+        setStreamStatus(null);
         let streamText = "";
 
         try {
             await streamRagQuery(
                 {query, knowledgeBaseId},
                 {
+                    onStatus: ({label}) => setStreamStatus(label),
                     onSources: ({sources: s}) => setSources(s),
                     onToken: ({text}) => {
+                        setStreamStatus(null);
                         streamText += text;
                         setAnswer(streamText);
                     },
@@ -74,14 +79,15 @@ export function useRagQuery() {
                 {signal: ac.signal}
             );
         } catch (e) {
-            if (!(e instanceof DOMException && e.name === "AbortError")) {
-                message.error(errMsg(e));
+            if (!isAbortError(e)) {
+                message.error(e instanceof RequestError ? errMsg(e) : streamErrText(e));
             }
+            setStreamStatus(null);
         } finally {
             setSubmitting(false);
             if (abortRef.current === ac) abortRef.current = null;
         }
     }, []);
 
-    return {submitting, answer, sources, submit};
+    return {submitting, answer, sources, streamStatus, submit};
 }

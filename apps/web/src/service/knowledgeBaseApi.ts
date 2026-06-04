@@ -21,6 +21,9 @@ export type KnowledgeBase = {
     updated_at: string;
 };
 
+export type DocumentIndexingStatus = "none" | "pending" | "indexed" | "failed";
+export type DocumentSummaryStatus = "none" | "pending" | "ready" | "failed";
+
 export type KnowledgeBaseDocument = {
     id: number;
     user_id: number;
@@ -28,6 +31,9 @@ export type KnowledgeBaseDocument = {
     title: string;
     file_path?: string | null;
     file_type?: string | null;
+    indexing_status: DocumentIndexingStatus;
+    summary_status: DocumentSummaryStatus;
+    summary_preview?: string | null;
     created_at: string;
     updated_at: string;
 };
@@ -58,6 +64,20 @@ export async function listDocuments(kbId: number): Promise<KnowledgeBaseDocument
 
 export async function deleteDocument(kbId: number, documentId: number): Promise<void> {
     await http.delete<{success: boolean}>(`/api/knowledge-bases/${kbId}/documents/${documentId}`);
+}
+
+export async function requestDocumentSummarize(kbId: number, documentId: number): Promise<void> {
+    await http.post<{success: boolean}>(
+        `/api/knowledge-bases/${kbId}/documents/${documentId}/summarize`,
+        {}
+    );
+}
+
+export async function requestDocumentIndex(kbId: number, documentId: number): Promise<void> {
+    await http.post<{success: boolean}>(
+        `/api/knowledge-bases/${kbId}/documents/${documentId}/index`,
+        {}
+    );
 }
 
 function uploadErrorMessage(data: unknown, fallback: string): string {

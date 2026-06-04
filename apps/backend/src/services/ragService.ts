@@ -159,6 +159,8 @@ class RAGService {
             minScore?: number;
             history?: RagChatHistory;
             signal?: AbortSignal;
+            extraSystemPolicy?: string;
+            forbidPlainFallback?: boolean;
         }
     ): AsyncGenerator<RagStreamPart> {
         if (opts?.userId == null) {
@@ -181,13 +183,20 @@ class RAGService {
         });
         const chunks = state.chunks as RagChunkItem[];
         const usePlain = this.shouldUsePlainChatFallback({chunks, evalResult: state.evalResult});
+        if (usePlain && opts?.forbidPlainFallback) {
+            yield {type: "context", chunks: []};
+            return;
+        }
         yield {type: "context", chunks: usePlain ? [] : chunks};
         if (usePlain) {
             yield* this.yieldPlainTokens(query, history, opts?.signal, {ragFallback: true});
             return;
         }
 
-        yield* this.yieldRagTokens(query, chunks, history, opts?.signal);
+        yield* this.yieldRagTokens(query, chunks, history, {
+            signal: opts?.signal,
+            extraSystemPolicy: opts?.extraSystemPolicy,
+        });
     }
 
     private async *yieldPlainTokens(
@@ -205,16 +214,21 @@ class RAGService {
         query: string,
         chunks: RagChunkItem[],
         history: RagChatHistory,
-        signal?: AbortSignal
+        streamOpts: {signal?: AbortSignal; extraSystemPolicy?: string}
     ): AsyncGenerator<RagStreamPart> {
         const llm = createLLM();
         const context = chunks
             .map((c, i) => `片段${i + 1}(score=${c.score.toFixed(SCORE_DECIMAL_PLACES)}):\n${c.content}`)
             .join("\n\n");
-        const messages = buildRagGenerationMessages(query, context, history);
+        const messages = buildRagGenerationMessages(
+            query,
+            context,
+            history,
+            streamOpts.extraSystemPolicy
+        );
 
         try {
-            const stream = await llm.stream(messages, {signal});
+            const stream = await llm.stream(messages, {signal: streamOpts.signal});
             for await (const chunk of stream) {
                 const text = messageChunkToText(chunk as AIMessageChunk);
                 if (text) yield {type: "token", text};

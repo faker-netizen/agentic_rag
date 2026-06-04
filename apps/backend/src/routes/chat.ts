@@ -1,7 +1,13 @@
 import express from "express";
 import chatService from "../services/chatService.js";
 import {parseRouteParamId, requireUserId} from "../utils/routeHelpers.js";
-import {bindRequestAbort, createSseWriter, setupSseResponse} from "../utils/sse.js";
+import {SSE_HEARTBEAT_INTERVAL_MS} from "../services/serviceConstants.js";
+import {
+    bindRequestAbort,
+    createSseWriter,
+    setupSseResponse,
+    startSseHeartbeat,
+} from "../utils/sse.js";
 
 const router = express.Router();
 
@@ -127,19 +133,26 @@ router.post("/sessions/:sessionId/messages", async (req, res) => {
         if (typeof content !== "string" || !content.trim()) {
             return res.status(400).json({error: "content 不能为空"});
         }
+        const rawSkill = req.body?.skillId;
+        const requestSkillId =
+            rawSkill === null || rawSkill === undefined || rawSkill === ""
+                ? null
+                : String(rawSkill);
         const session = await chatService.getSession(userId, sessionId);
         if (!session) return res.status(404).json({error: "会话不存在"});
 
         setupSseResponse(res);
         const {signal, cleanup} = bindRequestAbort(req);
+        const stopHeartbeat = startSseHeartbeat(res, SSE_HEARTBEAT_INTERVAL_MS);
         const sse = createSseWriter(res);
 
         try {
-            await chatService.appendMessage({userId, session, content, sse, signal});
+            await chatService.appendMessage({userId, session, content, sse, signal, requestSkillId});
         } catch (e) {
             const message = e instanceof Error ? e.message : "发送失败";
             sse("error", {message});
         } finally {
+            stopHeartbeat();
             cleanup();
         }
         res.end();

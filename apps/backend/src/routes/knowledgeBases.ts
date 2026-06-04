@@ -4,6 +4,7 @@ import path from 'path';
 import {fileURLToPath} from 'url';
 import knowledgeBaseService from '../services/knowledgeBaseService.js';
 import documentService from '../services/documentService.js';
+import {enqueueIndex, enqueueSummarize} from '../services/documentJobQueue.js';
 import {decodeMultipartUtf8} from '../utils/multipartUtf8.js';
 import {parseRouteParamId, requireUserId} from '../utils/routeHelpers.js';
 import {deleteStoredFile} from '../storage/localFileStorage.js';
@@ -152,7 +153,7 @@ router.post('/:kbId/upload', upload.single('file'), async (req, res) => {
             userId,
             kbId
         );
-        res.json({success: true, documentId, message: '文档上传并处理成功'});
+        res.json({success: true, documentId, message: '文档上传成功'});
     } catch (error) {
         if (uploadedPath) {
             await deleteStoredFile(uploadedPath);
@@ -160,6 +161,52 @@ router.post('/:kbId/upload', upload.single('file'), async (req, res) => {
         console.error('upload document failed:', error);
         const msg = error instanceof Error ? error.message : '上传文档失败';
         res.status(500).json({error: msg});
+    }
+});
+
+/** POST /api/knowledge-bases/:kbId/documents/:docId/summarize */
+router.post('/:kbId/documents/:docId/summarize', async (req, res) => {
+    try {
+        const userId = requireUserId(req, res);
+        if (userId == null) return;
+        const kbId = parseRouteParamId(req.params.kbId);
+        const docId = parseRouteParamId(req.params.docId);
+        if (kbId == null || docId == null) {
+            return res.status(400).json({error: '无效的 id'});
+        }
+        const kb = await knowledgeBaseService.getOwned(userId, kbId);
+        if (!kb) return res.status(404).json({error: '知识库不存在'});
+        const state = await documentService.beginSummarize(userId, kbId, docId);
+        if (state === 'missing') return res.status(404).json({error: '文档不存在'});
+        if (state === 'pending') return res.status(409).json({error: '摘要生成中'});
+        enqueueSummarize(userId, kbId, docId);
+        res.json({success: true});
+    } catch (error) {
+        console.error('summarize document failed:', error);
+        res.status(500).json({error: '触发摘要失败'});
+    }
+});
+
+/** POST /api/knowledge-bases/:kbId/documents/:docId/index */
+router.post('/:kbId/documents/:docId/index', async (req, res) => {
+    try {
+        const userId = requireUserId(req, res);
+        if (userId == null) return;
+        const kbId = parseRouteParamId(req.params.kbId);
+        const docId = parseRouteParamId(req.params.docId);
+        if (kbId == null || docId == null) {
+            return res.status(400).json({error: '无效的 id'});
+        }
+        const kb = await knowledgeBaseService.getOwned(userId, kbId);
+        if (!kb) return res.status(404).json({error: '知识库不存在'});
+        const state = await documentService.beginIndex(userId, kbId, docId);
+        if (state === 'missing') return res.status(404).json({error: '文档不存在'});
+        if (state === 'pending') return res.status(409).json({error: '索引建立中'});
+        enqueueIndex(userId, kbId, docId);
+        res.json({success: true});
+    } catch (error) {
+        console.error('index document failed:', error);
+        res.status(500).json({error: '触发索引失败'});
     }
 });
 

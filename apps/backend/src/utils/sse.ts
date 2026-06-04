@@ -11,6 +11,15 @@ export function setupSseResponse(res: Response): void {
     }
 }
 
+export function writeSseComment(res: Response, comment = "ping"): void {
+    if (res.writableEnded) return;
+    try {
+        res.write(`: ${comment}\n\n`);
+    } catch {
+        /* 客户端已断开 */
+    }
+}
+
 export function writeSseEvent(res: Response, event: string, data: Record<string, unknown>): void {
     if (res.writableEnded) return;
     try {
@@ -28,6 +37,11 @@ export function createSseWriter(res: Response): SseWriter {
 }
 
 /** 客户端断开时 abort；返回 cleanup 供 finally 调用 */
+export function startSseHeartbeat(res: Response, intervalMs: number): () => void {
+    const id = setInterval(() => writeSseComment(res), intervalMs);
+    return () => clearInterval(id);
+}
+
 export function bindRequestAbort(req: Request): {signal: AbortSignal; cleanup: () => void} {
     const abort = new AbortController();
     const onClose = () => abort.abort();

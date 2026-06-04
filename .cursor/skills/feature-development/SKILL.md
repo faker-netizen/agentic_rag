@@ -1,39 +1,29 @@
 ---
 name: feature-development
 description: >-
-  design_to_code monorepo 端到端功能开发——需求澄清、计划、实现、验证。用于新功能、
-  用户故事或多文件能力开发。
+  档位与 design 文档已确认后的实现——对照 lite 或 02 中 AC，自验软硬门禁，
+  用户目视验收、经同意才跑 E2E。T0 用 bugfix skill。
 ---
 
 # 功能开发
 
+**前置**：`tier-classification` 已确认；设计文档已确认：
+
+| 档位 | 判据文档 |
+|------|----------|
+| T1 | `planning/<slug>/01-change-lite.md` |
+| T2/T3 | `planning/<slug>/02-solution-design.md` |
+
+T0 → 使用 `bugfix` skill，非本 skill。
+
 ## 快速开始
 
-1. 新会话续作：先读 `.ai/progress/CURRENT.md`
-2. 新功能：先读 `.ai/planning/FEATURE-PLAN.md` 对齐范围与优先级
-3. **非 trivial 需求**：先完成 `requirements-design` skill 与 `design-review` gate，再进入本 skill
-4. 阅读 `.ai/workflows/feature-development.md`
-5. 写代码前通过 `.ai/gates/pre-implementation.md`
-6. 范围较大时使用 `.ai/templates/solution-design.md` 和 `.ai/templates/implementation-plan.md`
-7. 实现时遵循 `.cursor/rules/project.mdc` 及文件级 rules
-8. 提交前通过 `.ai/gates/code-quality.md`
-9. 提交时使用 `commit-workflow` skill
-10. 提交后使用 `project-progress` skill 写存档并更新 `CURRENT.md`
+1. 续作 — `CURRENT.md`；打开对应 planning/fixes 文档
+2. `feature-development.md` workflow + `agent-lifecycle.md`
+3. `pre-implementation` gate
+4. 实现 — 不超变更范围
+5. `post-implementation` → 用户目视 → 问 E2E
+6. 偏差 — `spec-deviation.md`
+7. 提交 / progress — 链接 planning 或 fixes 路径
 
-## 按层分工
-
-| 层级 | 路径 | 还需阅读 |
-|------|------|----------|
-| 前端 UI | `apps/web` | `frontend.mdc`；UI 用 `ui-page-development` + `css-layout` + `scrollable-layout` + `macbook-ui`；复杂组件用 `frontend-component`；gates：`frontend-quality`、`ui-quality` |
-| API | `apps/backend` | `backend.mdc`、`backend-service` skill、`.ai/gates/backend-quality.md`、`api-contract` |
-| 共享 UI | `packages/components` | `frontend.mdc` |
-
-## 完成标准
-
-- [ ] Gate：`pre-implementation`（有计划或用户明确免计划）
-- [ ] Gate：`code-quality`（lint-staged / lint 通过）
-- [ ] 新数据流已处理 loading / error / empty
-- [ ] 同一 commit 无无关重构
-- [ ] 已更新 `.ai/progress/` 存档（功能完成时）
-
-详细步骤：`.ai/workflows/feature-development.md`
+详细：`.ai/workflows/feature-development.md`

@@ -10,6 +10,8 @@ export type RagQueryResult = {
 };
 
 export type StreamRagQueryHandlers = {
+    onSkill?: (p: {skillId: string; skillName: string}) => void;
+    onStatus?: (p: {phase: string; label: string}) => void;
     onSources: (p: {sources: RagSource[]}) => void;
     onToken: (p: {text: string}) => void;
     onError: (p: {message: string}) => void;
@@ -21,17 +23,27 @@ export type StreamRagQueryHandlers = {
 export async function streamRagQuery(
     params: {query: string; knowledgeBaseId: number},
     handlers: StreamRagQueryHandlers,
-    options?: {signal?: AbortSignal}
+    options?: {signal?: AbortSignal; skillId?: string | null}
 ): Promise<void> {
     const url = `${apiBase()}/api/rag/query`;
     let answer = "";
     let sources: RagSource[] = [];
+    const body: {query: string; knowledgeBaseId: number; skillId?: string} = {
+        query: params.query.trim(),
+        knowledgeBaseId: params.knowledgeBaseId,
+    };
+    if (options?.skillId) body.skillId = options.skillId;
 
     await fetchSsePost(
         url,
-        {query: params.query.trim(), knowledgeBaseId: params.knowledgeBaseId},
+        body,
         (event, data) => {
-            if (event === "sources") {
+            if (event === "skill")
+                handlers.onSkill?.({
+                    skillId: String(data.skillId ?? ""),
+                    skillName: String(data.skillName ?? ""),
+                });
+            else if (event === "sources") {
                 sources = Array.isArray(data.sources) ? (data.sources as RagSource[]) : [];
                 handlers.onSources({sources});
             } else if (event === "token") {
@@ -51,6 +63,7 @@ export async function streamRagQuery(
             getToken: getAccessToken,
             refreshToken: refreshAccessToken,
             signal: options?.signal,
+            onStatus: handlers.onStatus,
         }
     );
 }

@@ -95,7 +95,7 @@
 
 .kb-finder__row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 10px 12px;
   border-radius: 10px;
@@ -140,6 +140,23 @@
 .kb-finder__row-meta {
   font-size: 11px;
   color: var(--color-text-secondary);
+}
+
+.kb-finder__row-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.kb-finder__row-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  justify-content: flex-end;
 }
 
 .kb-finder__row-delete {

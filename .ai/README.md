@@ -14,12 +14,15 @@
 .ai/templates/     → 产出物模板
 .ai/memory/        → 决策记录与失败日志
 .ai/progress/     → 进度存档（CURRENT + log/）
-.ai/planning/     → 功能规划（FEATURE-PLAN.md）
+.ai/planning/     → FEATURE-PLAN + 各档位变更落盘（见 planning/README.md）
+.ai/fixes/        → T0 Bug 修复落盘
 ```
 
 ## 快速链接
 
 - [**功能规划 / Roadmap**](./planning/FEATURE-PLAN.md)
+- [**Planning 落盘与档位**](./planning/README.md)
+- [**Bug 修复落盘 T0**](./fixes/README.md)
 - [**项目现状 / 续作入口**](./progress/CURRENT.md)
 - [进度说明](./progress/README.md)
 - [需求分析与方案设计](./workflows/requirements-design.md)

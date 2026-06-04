@@ -12,6 +12,7 @@ import {
 } from "./serviceConstants.js";
 import {buildRecallByPath, mergeRecallChunks, rowToChunkWithRankDecay} from "./ragMultiRecallFusion.js";
 import type {EmbeddingRow} from "./ragMultiRecallFusion.js";
+import {INDEXED_DOCUMENT_SQL} from "./documentTypes.js";
 import type {
     MultiRecallChunk,
     MultiRecallOptions,
@@ -36,6 +37,7 @@ function buildScope(
         parts.push("e.document_id = ?");
         args.push(documentId);
     }
+    parts.push(INDEXED_DOCUMENT_SQL);
     return {where: parts.join(" AND "), args};
 }
 

@@ -8,7 +8,7 @@ const {Title} = Typography;
 export default function RagPage() {
     const [form] = Form.useForm<{knowledgeBaseId: number; query: string}>();
     const {kbs, loadingKbs} = useRagKnowledgeBases(form);
-    const {submitting, answer, sources, submit} = useRagQuery();
+    const {submitting, answer, sources, streamStatus, submit} = useRagQuery();
 
     const onSubmit = async () => {
         try {
@@ -34,7 +34,12 @@ export default function RagPage() {
                     onSubmit={() => void onSubmit()}
                 />
             </Card>
-            <RagResultCard answer={answer} sources={sources} submitting={submitting} />
+            <RagResultCard
+                answer={answer}
+                sources={sources}
+                submitting={submitting}
+                streamStatus={streamStatus}
+            />
         </Space>
     );
 }

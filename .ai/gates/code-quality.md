@@ -8,7 +8,7 @@
 pnpm exec lint-staged   # pre-commit 模拟
 pnpm lint               # web + components + backend
 pnpm build
-pnpm test:e2e:smoke     # CI 自动；本地可选
+pnpm test:e2e:smoke     # CI 自动；**Agent 本地跑须用户确认**（见 post-implementation gate）
 ```
 
 ## ESLint AI Guardrails（硬门禁）

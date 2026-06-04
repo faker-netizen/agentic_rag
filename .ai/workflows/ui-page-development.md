@@ -24,14 +24,14 @@
 
 ## 5. 验证
 
-依次通过 `.ai/gates/frontend-quality.md`、`.ai/gates/ui-quality.md` 和 `.ai/gates/code-quality.md`。
+依次通过 `.ai/gates/frontend-quality.md`、`.ai/gates/ui-quality.md`；实现后走 [post-implementation](../gates/post-implementation.md)（硬/软门禁 + 用户目视 + **询问 E2E**）。
 
 DevTools 检查滚动区域：
 
 - `clientHeight > 0`
 - 内容溢出时：`clientHeight < scrollHeight`
 
-**E2E（推荐）：** 涉及路由/桌面壳/Dock/登录时跑 smoke：
+**E2E：** 用户同意后执行（见 [post-implementation](../gates/post-implementation.md)）：
 
 ```bash
 pnpm test:e2e:smoke

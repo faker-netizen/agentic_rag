@@ -6,6 +6,7 @@ import {
     insertUserMessage,
     loadChatHistory,
     maybeRefreshSessionTitle,
+    resolveStoredSkillId,
     streamAssistantReply,
 } from "./chatStreamHelpers.js";
 import {MAX_CHAT_TITLE_LENGTH} from "./serviceConstants.js";
@@ -25,6 +26,7 @@ export type ChatMessageRow = {
     role: string;
     content: string;
     sources_json: unknown | null;
+    skill_id: string | null;
     created_at: Date;
 };
 
@@ -101,7 +103,7 @@ class ChatService {
         const session = await this.getSession(userId, sessionId);
         if (!session) return [];
         const [rows] = await pool.query(
-            `SELECT m.id, m.session_id, m.role, m.content, m.sources_json, m.created_at
+            `SELECT m.id, m.session_id, m.role, m.content, m.sources_json, m.skill_id, m.created_at
              FROM chat_messages m
              INNER JOIN chat_sessions s ON s.id = m.session_id
              WHERE m.session_id = ? AND s.user_id = ?
@@ -121,13 +123,15 @@ class ChatService {
         content: string;
         sse: (event: string, data: Record<string, unknown>) => void;
         signal?: AbortSignal;
+        requestSkillId?: string | null;
     }): Promise<void> {
-        const {userId, session, content, sse, signal} = params;
+        const {userId, session, content, sse, signal, requestSkillId} = params;
         const text = content.trim();
         if (!text) throw new Error("消息内容不能为空");
 
         const history = await loadChatHistory(session.id);
-        const userMessageId = await insertUserMessage(session.id, text);
+        const storedSkillId = resolveStoredSkillId(requestSkillId, session.knowledge_base_id);
+        const userMessageId = await insertUserMessage(session.id, text, storedSkillId);
         sse("meta", {userMessageId});
 
         const {answer, sources, aborted} = await streamAssistantReply({
@@ -137,6 +141,7 @@ class ChatService {
             history,
             sse,
             signal,
+            requestSkillId: requestSkillId ?? null,
         });
 
         if (aborted) {

@@ -2,6 +2,7 @@ import mysql from 'mysql2/promise';
 import type {RowDataPacket} from 'mysql2';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
+import {migrateDocumentsIndexSummary} from './migrateDocumentsIndexSummary.js';
 
 dotenv.config();
 
@@ -138,6 +139,14 @@ async function createDocumentTables(connection: mysql.PoolConnection): Promise<v
   `);
 }
 
+async function migrateChatMessagesSkillId(connection: mysql.PoolConnection): Promise<void> {
+  if (!(await tableHasColumn(connection, 'chat_messages', 'skill_id'))) {
+    await connection.query(
+      "ALTER TABLE chat_messages ADD COLUMN skill_id VARCHAR(64) NULL AFTER content"
+    );
+  }
+}
+
 async function createChatTables(connection: mysql.PoolConnection): Promise<void> {
   await connection.query(`
     CREATE TABLE IF NOT EXISTS chat_sessions (
@@ -224,6 +233,7 @@ async function createUploadTables(connection: mysql.PoolConnection): Promise<voi
 
 async function createChatAndUploadTables(connection: mysql.PoolConnection): Promise<void> {
   await createChatTables(connection);
+  await migrateChatMessagesSkillId(connection);
   await createUploadTables(connection);
 }
 
@@ -255,6 +265,7 @@ export const initializeTables = async (): Promise<void> => {
     await createUserAuthTables(connection);
     await createDocumentTables(connection);
     await migrateKnowledgeBaseSchema(connection);
+    await migrateDocumentsIndexSummary(connection);
     await createChatAndUploadTables(connection);
     await seedAdminUser(connection);
 

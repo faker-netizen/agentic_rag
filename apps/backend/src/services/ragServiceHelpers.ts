@@ -10,6 +10,7 @@ import {
     RAG_CONTEXT_MAX_CHARS,
     RAG_TEMPERATURE,
 } from "./serviceConstants.js";
+import {INDEXED_DOCUMENT_SQL} from "./documentTypes.js";
 export type RagChunkItem = {
     content: string;
     score: number;
@@ -54,15 +55,17 @@ export function createLLM() {
 export function buildRagGenerationMessages(
     query: string,
     context: string,
-    history: RagChatHistory
+    history: RagChatHistory,
+    extraSystemPolicy?: string
 ): (SystemMessage | HumanMessage | AIMessage)[] {
-    const msgs: (SystemMessage | HumanMessage | AIMessage)[] = [
-        new SystemMessage(
-            "你是专业文档问答助手。主要依据【参考上下文】回答【当前问题】。\n" +
-                "若用户为追问、对比或指代，可结合【对话历史】理解意图；技术细节须来自参考上下文或历史中助手已给出的、与文档一致的内容，不要编造。\n" +
-                "若参考上下文与历史仍不足以回答，明确说明信息不足。"
-        ),
-    ];
+    let systemText =
+        "你是专业文档问答助手。主要依据【参考上下文】回答【当前问题】。\n" +
+        "若用户为追问、对比或指代，可结合【对话历史】理解意图；技术细节须来自参考上下文或历史中助手已给出的、与文档一致的内容，不要编造。\n" +
+        "若参考上下文与历史仍不足以回答，明确说明信息不足。";
+    if (extraSystemPolicy?.trim()) {
+        systemText += `\n\n【本 Skill 附加要求】\n${extraSystemPolicy.trim()}`;
+    }
+    const msgs: (SystemMessage | HumanMessage | AIMessage)[] = [new SystemMessage(systemText)];
     for (const h of history) {
         if (h.role === "user") msgs.push(new HumanMessage(h.content));
         else msgs.push(new AIMessage(truncateChatContent(h.content, RAG_CONTEXT_MAX_CHARS)));
@@ -121,6 +124,7 @@ export function buildEmbeddingScopeFilter(opts?: {
         parts.push("e.document_id = ?");
         args.push(opts.documentId);
     }
+    parts.push(INDEXED_DOCUMENT_SQL);
     return {parts, args};
 }
 

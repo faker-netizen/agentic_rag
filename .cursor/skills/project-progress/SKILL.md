@@ -23,7 +23,8 @@ description: >-
 1. 复制 `.ai/templates/progress-checkpoint.md` →  
    `.ai/progress/log/YYYY-MM-DD-简短slug.md`（英文 slug，小写连字符）
 2. 填写：做了什么、主要文件、如何验证、遗留项、commit hash
-3. 更新 `.ai/progress/CURRENT.md`：
+3. **链接** `.ai/planning/<slug>/` 或 `.ai/fixes/<slug>/`（含 `00-change-meta` / bugfix 记录）
+4. 更新 `.ai/progress/CURRENT.md`：
    - 「已完成」表加一行链接
    - 清空或更新「进行中」
    - 调整「下一步建议」
@@ -39,6 +40,8 @@ description: >-
 | 写什么 | 放哪 |
 |--------|------|
 | 功能做完、停在哪 | `progress/log/` + `CURRENT.md` |
+| 需求 / 方案（T1–T3） | `planning/<slug>/` |
+| Bug 修复（T0） | `fixes/<slug>/` |
 | 架构为什么这样 | `memory/project-decisions.md` |
 | 踩坑 | `memory/common-failures.md` |
 

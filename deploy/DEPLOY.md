@@ -2,7 +2,7 @@
 
 > **本文以 Ubuntu 22.04 LTS（jammy）为准**——与你当前 ECS 一致。其他系统见文末附录。
 
-架构：**Nginx（前端静态 + `/api` 反代）** + **Node 后端** + **RDS MySQL**（推荐）+ **上传文件存 ECS 磁盘**（Docker volume `uploads_data`）。
+架构：**MySQL（Docker）** + **Node 后端** + **Nginx（前端 + `/api` 反代）** + **上传文件 ECS 磁盘**（volume）。与本地一样用容器跑 MySQL，**不需要 RDS**。
 
 ---
 
@@ -57,13 +57,9 @@ sudo usermod -aG docker $USER
 sudo apt-get install -y git
 ```
 
-### 4. MySQL（推荐 RDS）
+### 4. 拉代码、配置、启动
 
-- 阿里云 **RDS MySQL 8.0**，与 ECS **同地域、同 VPC**
-- RDS 白名单加入 ECS **内网 IP**
-- 创建数据库 `rag_db`，记下内网地址、账号、密码
-
-### 5. 拉代码、配置、启动
+MySQL 会由 `docker-compose.prod.yml` **自动拉起**，不用单独买 RDS、不用手动建库。
 
 ```bash
 git clone <你的仓库地址> design_to_code
@@ -72,22 +68,25 @@ cp .env.production.example .env
 nano .env
 ```
 
-`.env` 最少填写（先用 IP 访问时）：
+`.env` 最少填写：
 
 ```bash
 HTTP_PORT=80
 CORS_ORIGIN=http://<ECS公网IP>
-DB_HOST=rm-xxxxx.mysql.rds.aliyuncs.com
-DB_PORT=3306
-DB_USER=...
-DB_PASSWORD=...
+
 DB_NAME=rag_db
-JWT_SECRET=$(openssl rand -base64 32)   # 或自行填长随机串
+DB_USER=rag
+DB_PASSWORD=你的数据库密码
+MYSQL_ROOT_PASSWORD=你的root密码
+
+JWT_SECRET=粘贴 openssl rand -base64 32 的结果
 ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=你的强密码
+ADMIN_PASSWORD=你的管理员密码
 QWEN_API_KEY=sk-...
 NODE_ENV=production
 ```
+
+`DB_HOST` 保持默认 `mysql` 即可（compose 里 backend 连 MySQL 容器名）。
 
 启动：
 
@@ -97,7 +96,7 @@ chmod +x deploy.sh
 # 若 docker 未加组：sudo ./deploy.sh
 ```
 
-### 6. 验证
+### 5. 验证
 
 ```bash
 curl http://127.0.0.1/health
@@ -105,7 +104,7 @@ curl http://127.0.0.1/health
 
 浏览器打开 `http://<ECS公网IP>`，用 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 登录。
 
-### 7. 更新版本
+### 6. 更新版本
 
 ```bash
 cd ~/design_to_code
@@ -123,21 +122,19 @@ cd deploy
 
 | 变量 | 说明 | 示例 |
 |------|------|------|
-| `DB_HOST` | RDS 内网地址 | `rm-xxx.mysql.rds.aliyuncs.com` |
-| `DB_PORT` | 端口 | `3306` |
-| `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 数据库账号 | |
-| `JWT_SECRET` | 随机长字符串（≥32 字符） | `openssl rand -base64 32` |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | 首次管理员 | 用于 Web 登录 |
-| `QWEN_API_KEY` | DashScope API Key | 控制台创建 |
-| `CORS_ORIGIN` | 浏览器访问的完整站点 URL | `https://rag.example.com` |
+| `CORS_ORIGIN` | 浏览器访问地址 | `http://47.xxx.xxx.xxx` |
+| `DB_USER` / `DB_PASSWORD` / `DB_NAME` | MySQL 容器账号（自行设定） | `rag` / 强密码 / `rag_db` |
+| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | 强密码 |
+| `JWT_SECRET` | 随机长字符串 | `openssl rand -base64 32` |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | 首次 Web 管理员 | |
+| `QWEN_API_KEY` | DashScope API Key | |
 
-**不需要 OSS。** 文档上传写入 backend 容器内 `/app/uploads`，由 compose 挂载到 volume `uploads_data`。
+**不需要 RDS、不需要 OSS。** MySQL 与上传文件均在 Docker volume（ECS 磁盘）。
 
 ### 可选给我（排查部署问题时）
 
-- RDS 是否已建好、白名单是否含 ECS 内网 IP
 - 是否有域名 / HTTPS
-- `docker compose -f docker-compose.prod.yml logs backend` 输出
+- `docker compose -f docker-compose.prod.yml logs backend` 或 `logs mysql` 输出
 
 ---
 
@@ -145,7 +142,7 @@ cd deploy
 
 | 路径 | 作用 |
 |------|------|
-| `deploy/docker-compose.prod.yml` | backend + web(Nginx) |
+| `deploy/docker-compose.prod.yml` | MySQL + backend + web(Nginx) |
 | `deploy/Dockerfile.backend` | 后端镜像 |
 | `deploy/Dockerfile.web` | 前端构建 + Nginx |
 | `deploy/nginx/default.conf` | 静态站 + `/api` SSE 反代 |
@@ -175,7 +172,7 @@ docker compose -f docker-compose.prod.yml down
 docker compose -f docker-compose.prod.yml up -d --build backend
 ```
 
-上传文件保存在 Docker volume `uploads_data` 中，**不要** `docker compose down -v`（会删数据）。
+上传与数据库保存在 Docker volume 中，**不要** `docker compose down -v`（会删 MySQL 与上传文件）。
 
 ---
 
@@ -198,7 +195,7 @@ docker compose -f docker-compose.prod.yml up -d --build backend
 |------|------|
 | `group docker does not exist` | Docker 未装好，重做「§2 安装 Docker」 |
 | `get.docker.com` SSL 失败 | 正常，勿用官方脚本，用阿里云镜像 |
-| 502 / 无法访问 API | `docker compose logs backend`；RDS 白名单与 `.env` |
+| 502 / 无法访问 API | `docker compose logs backend` / `logs mysql`；检查 `.env` 数据库密码 |
 | 登录后立刻掉线 | `CORS_ORIGIN` 与浏览器地址一致（含 `http://`） |
 | 上传失败 | 千问 Key；文件 ≤50MB |
 | CORS 报错 | `.env` 中 `CORS_ORIGIN` 缺协议或端口不对 |

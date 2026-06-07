@@ -4,6 +4,7 @@ import {useKnowledgeBaseList} from "@/hooks/useKnowledgeBaseList.ts";
 import DesktopSurface from "./DesktopSurface.tsx";
 import Dock from "./Dock.tsx";
 import MenuBar from "./MenuBar.tsx";
+import OpenAppsBar from "./OpenAppsBar.tsx";
 import WindowLayer from "./WindowLayer.tsx";
 import {DesktopKnowledgeBaseContext} from "./desktopKnowledgeBaseContext.ts";
 import {WindowManagerProvider} from "./windowManager.tsx";
@@ -39,6 +40,7 @@ function DesktopShellInner() {
                 <MenuBar />
                 <DesktopSurface />
                 <WindowLayer />
+                <OpenAppsBar />
                 <Dock />
             </div>
         </DesktopKnowledgeBaseContext.Provider>

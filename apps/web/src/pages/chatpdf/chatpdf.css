@@ -1,0 +1,113 @@
+.chatpdf-layout {
+  flex-direction: row !important;
+}
+
+.chatpdf-viewer {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+.chatpdf-viewer--empty,
+.chatpdf-viewer--loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+}
+
+.chatpdf-viewer__pager {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-panel-sm);
+  padding: 6px;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--mac-toolbar-bg);
+}
+
+.chatpdf-viewer__doc {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-sidebar);
+}
+
+.chatpdf-summary {
+  width: var(--mac-list-panel-width);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.chatpdf-summary__header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px var(--space-panel-sm);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+}
+
+.chatpdf-summary__status {
+  padding: 0 var(--space-panel-sm) var(--space-sidebar);
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.chatpdf-summary__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-sidebar) var(--space-panel-sm);
+}
+
+.chatpdf-summary__loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-panel-lg);
+}
+
+.chatpdf-summary__list {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.chatpdf-summary__item {
+  margin-bottom: var(--space-panel-sm);
+  line-height: 1.5;
+  font-size: var(--text-base);
+}
+
+.chatpdf-cite-link {
+  margin-left: 4px;
+  padding: 0 4px;
+  border: none;
+  background: var(--mac-selected-bg);
+  color: var(--color-accent);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.chatpdf-cite-link:hover {
+  background: rgba(0, 122, 255, 0.2);
+}
+
+.chatpdf-hl {
+  background: rgba(255, 230, 0, 0.55);
+  outline: 1px solid rgba(255, 180, 0, 0.8);
+}

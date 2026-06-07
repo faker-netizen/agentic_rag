@@ -110,11 +110,12 @@ Phase 4  验证：固定测例 + 对用户文档试跑 → 通过才「发布」
 | **RAG 对话** | 会话、流式、引用 | `pages/chat`（Dock） | `chatService` | ✅ 已有，将演进为域 Skill 入口 |
 | **业务域 Skill** | 域路由 + Tool Call + 文档 scope | 待设计 | **核心建设** | 📋 **P0** |
 | **Skill 工坊** | 女娲式创建/提炼/验证 → 注册表 | 待设计（Dock 或 KB 内） | `skillStudioService` 等 | 📋 **P1**（依赖 F-00） |
-| **ChatPDF** | PDF 专注对话与标注 | Dock 占位 | 扩展 document 类型 | 📋 P1 |
+| **ChatPDF** | PDF 阅读器 + 分点引用总结 | `pages/chatpdf` | `chatpdf` API、`document_pages` | 📋 **进行中** → `feat-f-05-chatpdf` |
 | **Agent** | 多步工具调用 | `pages/agent` | agent 相关 | 🟡 部分，可复用于 Tool 层 |
 | **内容采集** | 公众号 / URL 抓取、清洗入库 | 未建 | 未建 | 📋 Phase 3 |
 | **Markdown 编辑** | 本地笔记 / 整理 | `pages/typora` | — | 🟡 可选 |
 | **工程化** | Harness、CI | `.cursor/`、`.ai/` | lint/tsc | 🟡 进行中 |
+| **Android 客户端** | 薄 WebView 壳 → 后期 Capacitor 内嵌 H5 | `android-shell`（规划） | 复用现有 API | 📋 **搁置** → `feat-f-13-android-webview-shell` |
 | ~~Design → Code~~ | 原仓库名方向 | — | — | ⬜ 已搁置 |
 
 图例：**✅ 已有** · **🟡 部分** · **📋 已规划** · **⬜ 搁置/未开始**
@@ -181,7 +182,7 @@ Phase 4  验证：固定测例 + 对用户文档试跑 → 通过才「发布」
 | F-01 | 重构 `chatService` | P0 | — | 为 Skill 执行器铺路 |
 | F-02 | 拆分 `pages/chat` | P1 | F-00b | 展示 Skill 名与引用 |
 | F-03 | Harness 文档 commit | P1 | — | |
-| F-05 | ChatPDF 应用 | P1 | F-00 | PDF 域 tools |
+| **F-05** | **ChatPDF**（独立 PDF 域，不绑 KB） | **P1** | F-00 SSE | `feat-f-05-chatpdf`；阅读器+分点引用总结 |
 | F-04 | 知识库 Dock 应用 | P1 | 桌面壳 | |
 | F-10 | 公众号 / URL 采集 MVP | P2 | 文档管线 | Phase 3 |
 | **F-11** | **Skill 工坊（女娲式蒸馏，产品化）** | **P1** | **F-00** | 见上文 §Skill 工坊 |
@@ -190,6 +191,10 @@ Phase 4  验证：固定测例 + 对用户文档试跑 → 通过才「发布」
 | F-11c | 视角/顾问类 Skill + 强制 citation | P2 | F-11a、F-00b | 可选；公网调研非 MVP |
 | **F-12** | **文档索引 + 预摘要 + 全库概览 Skill**（上传默认仅入库、Finder 按钮、 `kb-catalog`） | **P1** | F-00、文档管线 | 规划：`feat-f-12-doc-index-summary`；取代原「仅 indexing_status」窄范围 |
 | F-07 | CI workflow | P2 | — | |
+| **F-13** | **Android 客户端（远程 WebView 壳 → 后期 Hybrid）** | **P2** | Web 可部署、mobile 布局 | **搁置**；仅 Android；`feat-f-13-android-webview-shell` |
+| F-13a | 远程 WebView 薄壳 + 加载线上 Web | P2 | F-13 | MVP |
+| F-13b | `apps/web` mobile 布局（Tab，无桌面壳） | P2 | — | 远程壳验收依赖 |
+| F-13c | Capacitor 内嵌 dist + 按需 Bridge | P3 | F-13a/b | 后期 |
 | ~~F-09~~ | ~~Design → Code~~ | — | — | 已搁置 |
 
 开工前：**Agent 提议档位 → 用户确认** → 按 [planning/README.md](./README.md) 落盘（T0→`fixes/`；T1 lite；T2/T3 完整 01+02）；完成后 `progress/log/`。

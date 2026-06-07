@@ -5,9 +5,9 @@ import {MenuFoldOutlined, MenuUnfoldOutlined} from "@ant-design/icons";
 import type {ItemType} from "antd/es/menu/interface";
 import {router} from "@/router";
 import {clearAuth} from "@/service/token.ts";
-import {GlassSurface, WindowShell} from "@/components/shell";
+import {MacSidebar, WindowShell} from "@/components/shell";
 
-const {Content, Sider} = Layout;
+const {Content} = Layout;
 
 type Handle = {
     title?: string;
@@ -89,14 +89,7 @@ function RootLayout() {
                 }
             >
                 <Layout className="window-shell__layout">
-                    <Sider
-                        theme="light"
-                        collapsible
-                        collapsed={collapsed}
-                        trigger={null}
-                        width={220}
-                        className="window-shell__sidebar"
-                    >
+                    <MacSidebar collapsed={collapsed}>
                         <Menu
                             className="mac-menu"
                             theme="light"
@@ -105,12 +98,10 @@ function RootLayout() {
                             selectedKeys={[selectedKey]}
                             onClick={(e) => navigate(e.key)}
                         />
-                    </Sider>
+                    </MacSidebar>
 
-                    <Content className="window-shell__content">
-                        <GlassSurface variant="panel" padding="none" flex>
-                            <Outlet />
-                        </GlassSurface>
+                    <Content className="window-shell__content mac-scrollbar">
+                        <Outlet />
                     </Content>
                 </Layout>
             </WindowShell>

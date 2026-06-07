@@ -107,6 +107,7 @@ class DocumentService {
                     created_at, updated_at
              FROM documents
              WHERE user_id = ? AND knowledge_base_id = ?
+               AND (origin IS NULL OR origin = 'knowledge_base')
              ORDER BY created_at DESC`,
             [DOCUMENT_SUMMARY_PREVIEW_CHARS, userId, knowledgeBaseId]
         );

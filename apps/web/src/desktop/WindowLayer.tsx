@@ -6,8 +6,8 @@ export default function WindowLayer() {
 
     return (
         <div className="window-layer" aria-live="polite">
-            {windows.map((win, index) => (
-                <AppWindow key={win.id} window={win} stackIndex={index} />
+            {windows.map((win) => (
+                <AppWindow key={win.id} window={win} />
             ))}
         </div>
     );

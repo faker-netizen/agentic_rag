@@ -115,7 +115,7 @@ Agent 可通过 MCP 查库文档与做浏览器验证。配置见 [`.cursor/mcp.
 - **Phase 1（进行中）**：业务域 Skill 框架、Tool Call、域路由
 - **Phase 2**：ChatPDF、知识库 Dock 应用
 - **Phase 3**：公众号 / URL 内容采集与整理
-- **Phase 4**：CI、E2E、生产部署
+- **Phase 4**：CI、E2E、生产部署 → 见 [deploy/DEPLOY.md](./deploy/DEPLOY.md)
 
 完整规划见 [FEATURE-PLAN.md](./.ai/planning/FEATURE-PLAN.md)。
 

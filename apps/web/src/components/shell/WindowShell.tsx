@@ -1,4 +1,5 @@
 import type {ReactNode} from "react";
+import MacTrafficLights from "./MacTrafficLights.tsx";
 import "./shell.css";
 
 export interface WindowShellProps {
@@ -20,15 +21,13 @@ export default function WindowShell({
         <div className={["window-shell", className].filter(Boolean).join(" ")}>
             <div className="window-shell__frame">
                 <header className="window-shell__titlebar">
-                    {showTrafficLights && (
-                        <div className="window-shell__traffic" aria-hidden>
-                            <span className="window-shell__dot window-shell__dot--red" />
-                            <span className="window-shell__dot window-shell__dot--yellow" />
-                            <span className="window-shell__dot window-shell__dot--green" />
-                        </div>
-                    )}
+                    <div className="window-shell__titlebar-slot window-shell__titlebar-slot--left">
+                        {showTrafficLights ? <MacTrafficLights /> : null}
+                    </div>
                     <div className="window-shell__title">{title}</div>
-                    {toolbar && <div className="window-shell__toolbar">{toolbar}</div>}
+                    <div className="window-shell__titlebar-slot window-shell__titlebar-slot--right">
+                        {toolbar ? <div className="window-shell__toolbar">{toolbar}</div> : null}
+                    </div>
                 </header>
                 <div className="window-shell__body">{children}</div>
             </div>

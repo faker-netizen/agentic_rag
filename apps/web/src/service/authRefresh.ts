@@ -1,7 +1,9 @@
 import {setAccessToken} from "@/service/token.ts";
 
+import {apiBaseUrl} from "@/service/apiBase.ts";
+
 export function apiBase(): string {
-    return import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+    return apiBaseUrl();
 }
 
 /** 与 chat 流式请求共用：刷新 accessToken（依赖 httpOnly refresh cookie） */

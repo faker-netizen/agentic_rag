@@ -1,12 +1,13 @@
 import axios, {type AxiosInstance, type AxiosRequestConfig} from "axios";
 import {attachRequestInterceptor, attachResponseInterceptor} from "@/service/httpClientInterceptors.ts";
 import {unwrap} from "@/service/httpClientUtils.ts";
+import {apiBaseUrl} from "@/service/apiBase.ts";
 
 export {RequestError, type ApiErrorResponse} from "@/service/httpClientUtils.ts";
 
 function createHttpClient(): AxiosInstance {
     const instance = axios.create({
-        baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3001",
+        baseURL: apiBaseUrl(),
         timeout: 15000,
         withCredentials: true,
         headers: {"Content-Type": "application/json"},

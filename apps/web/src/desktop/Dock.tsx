@@ -11,7 +11,7 @@ export default function Dock() {
             message.info("即将推出");
             return;
         }
-        openApp(appId);
+        openApp(appId, undefined, undefined, {fromDock: true});
     };
 
     return (
@@ -25,6 +25,7 @@ export default function Dock() {
                         <button
                             key={app.id}
                             type="button"
+                            data-dock-app={app.id}
                             className={[
                                 "desktop-dock__item",
                                 !app.available && "desktop-dock__item--disabled",

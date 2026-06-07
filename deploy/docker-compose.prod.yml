@@ -1,0 +1,36 @@
+# 生产部署：backend + Nginx(前端静态 + /api 反代)
+# 用法见 deploy/DEPLOY.md
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    container_name: d2c-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - d2c
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    container_name: d2c-web
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      - backend
+    networks:
+      - d2c
+
+volumes:
+  uploads_data:
+
+networks:
+  d2c:
+    driver: bridge

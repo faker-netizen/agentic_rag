@@ -51,13 +51,25 @@ sudo usermod -aG docker $USER
 
 **退出 SSH 重新登录**，再执行 `docker ps`。若懒得加组，后面命令前加 `sudo` 即可。
 
-### 3. 安装 Git（若尚未安装）
+### 3. 配置 Docker 镜像加速（国内 ECS 必做）
+
+Docker Hub 在国内常超时（`registry-1.docker.io i/o timeout`）。**首次部署前**执行：
+
+```bash
+cd ~/apps/rag/design_to_code/deploy   # 换成你的 deploy 路径
+chmod +x setup-docker-mirror.sh
+sudo ./setup-docker-mirror.sh
+```
+
+看到 `docker pull node:22-alpine` 成功后再 `./deploy.sh`。
+
+### 4. 安装 Git（若尚未安装）
 
 ```bash
 sudo apt-get install -y git
 ```
 
-### 4. 拉代码、配置、启动
+### 5. 拉代码、配置、启动
 
 MySQL 会由 `docker-compose.prod.yml` **自动拉起**，不用单独买 RDS、不用手动建库。
 
@@ -96,7 +108,7 @@ chmod +x deploy.sh
 # 若 docker 未加组：sudo ./deploy.sh
 ```
 
-### 5. 验证
+### 6. 验证
 
 ```bash
 curl http://127.0.0.1/health
@@ -104,7 +116,7 @@ curl http://127.0.0.1/health
 
 浏览器打开 `http://<ECS公网IP>`，用 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 登录。
 
-### 6. 更新版本
+### 7. 更新版本
 
 ```bash
 cd ~/design_to_code
@@ -194,7 +206,9 @@ docker compose -f docker-compose.prod.yml up -d --build backend
 | 现象 | 检查 |
 |------|------|
 | `group docker does not exist` | Docker 未装好，重做「§2 安装 Docker」 |
-| `get.docker.com` SSL 失败 | 正常，勿用官方脚本，用阿里云镜像 |
+| `get.docker.com` SSL 失败 | 正常，勿用官方脚本，用阿里云 apt 镜像 |
+| `registry-1.docker.io` 超时 | 先 `sudo ./setup-docker-mirror.sh`，再 `./deploy.sh` |
+| `docker/dockerfile:1` 拉取失败 | `git pull` 最新代码（已移除该依赖） |
 | 502 / 无法访问 API | `docker compose logs backend` / `logs mysql`；检查 `.env` 数据库密码 |
 | 登录后立刻掉线 | `CORS_ORIGIN` 与浏览器地址一致（含 `http://`） |
 | 上传失败 | 千问 Key；文件 ≤50MB |

@@ -1,46 +1,78 @@
 import {Suspense} from "react";
 import {Spin} from "antd";
+import {MacTrafficLights} from "@/components/shell";
 import {APP_COMPONENTS} from "./appRegistry.tsx";
+import {useAppWindowFrame} from "./useAppWindowFrame.ts";
 import {useWindowManager} from "./useWindowManager.ts";
 import {WindowContentContext} from "./windowContentContext.ts";
 import type {WindowInstance} from "./types.ts";
+import {useParams} from "react-router-dom";
 
 type AppWindowProps = {
     window: WindowInstance;
-    stackIndex: number;
 };
 
-export default function AppWindow({window, stackIndex}: AppWindowProps) {
-    const {closeWindow, focusWindow, focusedId} = useWindowManager();
+export default function AppWindow({window}: AppWindowProps) {
+    const {
+        closeWindow,
+        minimizeWindow,
+        focusWindow,
+        moveWindow,
+        clearOpeningAnimation,
+        focusedId,
+    } = useWindowManager();
     const focused = focusedId === window.id;
     const AppComponent = APP_COMPONENTS[window.appId];
 
-    const offset = stackIndex * 28;
+    const {rootRef, titlebarRef, isDragging, dragHandlers} =
+        useAppWindowFrame({window, moveWindow, clearOpeningAnimation});
+
+    function f(keyA:string,keyB:string,keyC:string,parms:any[]){}
+             f('string','number','string',['a',1,'f'])
 
     return (
         <div
-            className={["app-window", focused && "app-window--focused"].filter(Boolean).join(" ")}
+            ref={rootRef}
+            className={[
+                "app-window",
+                focused && "app-window--focused",
+                isDragging && "app-window--dragging",
+                window.minimized && "app-window--minimized",
+            ]
+                .filter(Boolean)
+                .join(" ")}
             style={{
                 width: window.rect.width,
                 height: window.rect.height,
-                zIndex: window.zIndex,
-                transform: `translate(calc(-50% + ${offset}px), calc(-50% + ${offset}px))`,
+                zIndex: window.minimized ? -1 : window.zIndex,
+                ...(isDragging
+                    ? {}
+                    : {left: window.position.x, top: window.position.y}),
             }}
-            onMouseDown={() => focusWindow(window.id)}
+            aria-hidden={window.minimized || undefined}
+            onMouseDown={() => {
+                if (!window.minimized) focusWindow(window.id);
+            }}
         >
             <div className="app-window__frame">
-                <header className="app-window__titlebar">
-                    <div className="app-window__traffic">
-                        <button
-                            type="button"
-                            className="app-window__dot app-window__dot--red"
-                            aria-label="关闭"
-                            onClick={() => closeWindow(window.id)}
+                <header
+                    ref={titlebarRef}
+                    className="app-window__titlebar app-window__titlebar--draggable"
+                    onPointerDown={dragHandlers.onPointerDown}
+                    onPointerMove={dragHandlers.onPointerMove}
+                    onPointerUp={dragHandlers.onPointerUp}
+                >
+                    <div className="window-shell__titlebar-slot window-shell__titlebar-slot--left">
+                        <MacTrafficLights
+                            onClose={() => closeWindow(window.id)}
+                            onMinimize={() => minimizeWindow(window.id)}
                         />
-                        <span className="app-window__dot app-window__dot--yellow" aria-hidden />
-                        <span className="app-window__dot app-window__dot--green" aria-hidden />
                     </div>
                     <div className="app-window__title">{window.title}</div>
+                    <div
+                        className="window-shell__titlebar-slot window-shell__titlebar-slot--right"
+                        aria-hidden
+                    />
                 </header>
                 <div className="app-window__body">
                     {AppComponent ? (

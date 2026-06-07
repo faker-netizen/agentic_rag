@@ -26,7 +26,11 @@
 
 ## 进行中
 
-- **产品：** 业务域 Skill 框架（F-00）— 仅规划阶段，见 FEATURE-PLAN
+- **产品：** 业务域 Skill 框架（F-00）、ChatPDF（F-05）等 — 见 FEATURE-PLAN
+
+## 已搁置（方案已落盘）
+
+- **F-13 Android 客户端** — 远程 WebView 壳 → 后期 Hybrid；见 `.ai/planning/feat-f-13-android-webview-shell/`
 
 ## 下一步建议（按新方向）
 

@@ -14,6 +14,7 @@ import {
     type ApiErrorResponse,
     type RetryConfig,
 } from "@/service/httpClientUtils.ts";
+import {apiBaseUrl} from "@/service/apiBase.ts";
 
 const IDEMPOTENT_METHODS = new Set(["get", "head", "options"]);
 
@@ -49,7 +50,7 @@ const isCredentialRejected401 = (url?: string) =>
 
 const doRefresh = async () => {
     const res = await axios.post(
-        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3001"}/api/auth/refresh`,
+        `${apiBaseUrl()}/api/auth/refresh`,
         {},
         {withCredentials: true, timeout: 10000}
     );

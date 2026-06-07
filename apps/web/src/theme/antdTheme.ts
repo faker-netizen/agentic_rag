@@ -16,14 +16,14 @@ export const antdTheme: ThemeConfig = {
         Menu: {
             itemBorderRadius: 8,
             itemMarginInline: 8,
-            itemHeight: 40,
+            itemHeight: 36,
             activeBarBorderWidth: 0,
         },
         Card: {
             borderRadiusLG: 16,
         },
         Button: {
-            controlHeight: 36,
+            controlHeight: 32,
             borderRadius: 8,
         },
         Layout: {

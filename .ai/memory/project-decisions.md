@@ -48,11 +48,23 @@
 - **决策：** 变更四档 T0–T3；Agent 提议 + 用户确认；T0→`.ai/fixes/`；T1→lite 单停点；T2/T3→完整 01+02。见 `planning/README.md`。
 - **参考：** `.ai/workflows/requirements-design.md`、`.ai/gates/design-review.md`
 
+## 2026-06 — F-05 ChatPDF MVP 引用模型
+
+- **决策：** ChatPDF 总结为 **分点 + 递增数字引用**；跳转采用 **页码 + 页内 excerpt 搜索高亮**；文档 **`origin=chatpdf`、`knowledge_base_id=NULL`**，仅 Dock/ChatPDF 上传，**不**与知识库/Finder 打通。
+- **参考：** `.ai/planning/feat-f-05-chatpdf/`
+
 ## 2026-06 — F-12：入库 ≠ 索引 ≠ 摘要
 
 - **决策：** 文档上传默认 **仅落库全文**；**向量索引**与 **LLM 预摘要** 由用户在知识库 Finder **分别显式触发**；全库总结类问答走 Skill **`kb-catalog`**（列举文档 + 读已存摘要），不在聊天内自动批量摘要（MVP）。
 - **原因：** 对齐「总结库里所有文件」产品预期；控制成本；与 F-00 `kb_search` 语义检索分工。
 - **参考：** `.ai/planning/feat-f-12-doc-index-summary/01-requirements.md`
+
+## 2026-06 — F-13 Android 客户端：搁置与路线
+
+- **决策：** Android 客户端 **本期搁置**；方案落盘于 `feat-f-13-android-webview-shell`。**首期**采用 **薄 WebView 壳加载线上已部署 Web**；**后期**可迁 **Capacitor 内嵌 H5**。**不做** React Native 首期、**不做** iOS。
+- **原因：** 优先 Web 主线（F-00 / F-05 / F-12）；远程壳实现成本最低；内嵌 Hybrid 与 JS Bridge 留待 mobile 布局与部署稳定后再做。
+- **迁移认知：** 远程壳 → 内嵌 Hybrid 的主线是 **构建产物打包 + 发布流程 + API/路由在 WebView 内验通**；JS Bridge 仅在需要原生能力（文件、推送等）时增量接入，非迁移唯一工作。
+- **参考：** `.ai/planning/feat-f-13-android-webview-shell/`
 
 ## 2026-05 — Cursor MCP（Context7 + Playwright）
 

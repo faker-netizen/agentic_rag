@@ -13,6 +13,8 @@ const router = express.Router();
 router.post("/login", async (req, res) => {
     try {
         const {email, password} = req.body ?? {};
+
+        console.log(email,password)
         if (!email || !password) {
             return res.status(400).json({error: "email/password 不能为空"});
         }

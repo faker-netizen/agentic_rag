@@ -1,0 +1,17 @@
+# Dependencies
+node_modules
+**/node_modules
+.git
+.github
+e2e
+e2e/test-results
+e2e/playwright-report
+**/*.md
+.cursor
+.ai
+.playwright-mcp
+apps/backend/uploads
+**/.env
+**/.env.*
+!**/.env.example
+!deploy/.env.production.example

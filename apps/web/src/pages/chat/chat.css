@@ -3,6 +3,7 @@
 .chat-page {
   flex: 1;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -19,8 +20,9 @@
 
 /* 侧栏 */
 .chat-sidebar.ant-layout-sider {
-  background: rgba(255, 255, 255, 0.28) !important;
+  background: var(--mac-sidebar-bg) !important;
   overflow: hidden;
+  border-right: 1px solid var(--color-border-subtle);
 }
 
 .chat-sidebar .ant-layout-sider-children {
@@ -65,11 +67,11 @@
 }
 
 .chat-session-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--mac-hover-bg);
 }
 
 .chat-session-item--selected {
-  background: rgba(0, 122, 255, 0.1);
+  background: var(--mac-selected-bg);
   border-color: rgba(0, 122, 255, 0.12);
 }
 
@@ -79,8 +81,8 @@
 }
 
 .chat-session-item__title {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: var(--text-md);
+  font-weight: var(--font-medium);
   color: var(--color-text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -124,14 +126,16 @@
 }
 
 .chat-main__header {
-  padding: 10px 16px;
+  padding: 10px var(--space-panel-md);
   border-bottom: 1px solid var(--color-border-subtle);
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--mac-toolbar-bg);
+  backdrop-filter: blur(var(--blur-sidebar));
+  -webkit-backdrop-filter: blur(var(--blur-sidebar));
 }
 
 .chat-main__title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
   color: var(--color-text-primary);
 }
 

@@ -1,7 +1,34 @@
-# 生产部署：backend + Nginx(前端静态 + /api 反代)
+# 生产部署：MySQL + backend + Nginx(前端静态 + /api 反代)
 # 用法见 deploy/DEPLOY.md
 
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: d2c-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-rag_db}
+      MYSQL_USER: ${DB_USER:-rag}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?请设置 DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      [
+        "mysqld",
+        "--default-authentication-plugin=mysql_native_password",
+        "--character-set-server=utf8mb4",
+        "--collation-server=utf8mb4_unicode_ci",
+      ]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u${DB_USER:-rag}", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - d2c
+
   backend:
     build:
       context: ..
@@ -10,8 +37,13 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      DB_HOST: mysql
     volumes:
       - uploads_data:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
     networks:
       - d2c
 
@@ -29,6 +61,7 @@ services:
       - d2c
 
 volumes:
+  mysql_data:
   uploads_data:
 
 networks:
